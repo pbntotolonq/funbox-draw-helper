@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0b1220">
+<title>FUNBOX 抽選助手</title>
+<style>
+:root{--card:#111c2f;--text:#f4f7fb;--muted:#9badc4;--line:#263752;--accent:#35d07f;--blue:#4b8cff}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{margin:0;background:linear-gradient(180deg,#07101e,#0c1626);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans TC",sans-serif}
+button,select{font:inherit;touch-action:manipulation}
+.wrap{max-width:760px;margin:auto;padding:16px 14px 120px}
+.hero{padding:10px 2px 16px}.hero h1{font-size:25px;margin:0 0 5px}.hero p{margin:0;color:var(--muted);font-size:13px}
+.card{background:rgba(17,28,47,.97);border:1px solid var(--line);border-radius:18px;padding:15px;margin:12px 0}
+h2{font-size:17px;margin:0 0 12px}.sub{font-size:12px;color:var(--muted);margin:-6px 0 12px}
+.chips{display:flex;flex-wrap:wrap;gap:8px}.chip{border:1px solid #365071;background:#0e192a;color:#dce8f7;padding:10px 13px;border-radius:999px;font-weight:700;font-size:14px}.chip.on{background:#174c36;border-color:#35d07f;color:#dffff0}
+.order{margin-top:12px;display:flex;flex-wrap:wrap;gap:6px}.tag{background:#20324b;padding:6px 9px;border-radius:9px;font-size:12px}
+select{width:100%;padding:12px;border-radius:12px;border:1px solid #344a69;background:#0b1627;color:#fff}
+.priority{display:grid;grid-template-columns:34px 1fr;gap:9px;align-items:center;margin:9px 0}.num{width:32px;height:32px;border-radius:50%;display:grid;place-items:center;background:#253956;font-weight:800}
+.actions{display:grid;grid-template-columns:1fr 1fr;gap:9px}.btn{border:0;border-radius:13px;padding:13px;font-weight:800;background:#243750;color:white}.btn.primary{background:var(--accent);color:#052514}.btn.blue{background:var(--blue)}.btn.danger{background:#552834}.btn:disabled{opacity:.45}
+.stat{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.stat div{background:#0b1627;border-radius:12px;padding:10px;text-align:center}.stat b{display:block;font-size:20px}.stat small{color:var(--muted)}
+.queue{max-height:310px;overflow:auto;margin-top:10px}.q{display:grid;grid-template-columns:30px 1fr auto;gap:8px;align-items:center;padding:10px 2px;border-bottom:1px solid #23344e}.q .meta{font-size:12px;color:var(--muted)}.badge{font-size:11px;padding:4px 7px;border-radius:7px;background:#253a58}.badge.p{background:#624b13;color:#ffe59c}
+.now{background:#0a1828;border:1px solid #2e496c;border-radius:14px;padding:13px;margin:10px 0}.now strong{font-size:18px}.now .muted{color:var(--muted);font-size:12px}
+.notice{background:#2c2513;border:1px solid #685520;color:#ffe6a6;border-radius:12px;padding:10px;font-size:12px;line-height:1.5}
+.ok{background:#12351f;border-color:#2c7b4a;color:#caffdc}
+.sticky{position:fixed;bottom:0;left:0;right:0;background:#0a1322ef;backdrop-filter:blur(12px);border-top:1px solid #273a56;padding:10px 14px calc(10px + env(safe-area-inset-bottom));z-index:10}.stickyin{max-width:760px;margin:auto;display:grid;grid-template-columns:1fr 1fr;gap:9px}
+.tiny{font-size:11px;color:var(--muted)}
+</style>
+</head>
+<body><div class="wrap">
+<div class="hero"><h1>⚡ FUNBOX 抽選助手</h1><p>網頁測試 v0.3 · GitHub Pages 版</p></div>
+<div id="jsStatus" class="notice">正在啟動程式…</div>
+<div class="notice">目前先驗證多地區、優先 1～5、抽選佇列與「離開頁面 → 回來 → 下一抽」流程。LINE 實際抽獎連結會在下一階段逐筆接上。</div>
+
+<section class="card"><h2>1. 選擇地區（可多選）</h2><div class="sub">點選順序就是一般品項的地區抽選順序。</div><div id="areas" class="chips"></div><div id="areaOrder" class="order"></div></section>
+
+<section class="card"><h2>2. 優先抽選 1～5</h2><div class="sub">只列出已選地區實際存在的商品代碼。</div><div id="priorities"></div></section>
+
+<section class="card"><h2>3. 建立抽選順序</h2><div class="actions"><button class="btn blue" id="build">建立 / 更新佇列</button><button class="btn" id="reset">清除設定</button></div>
+<div class="stat" style="margin-top:12px"><div><b id="count">0</b><small>總抽數</small></div><div><b id="pc">0</b><small>優先抽</small></div><div><b id="gc">0</b><small>一般抽</small></div></div>
+<div id="queue" class="queue"></div></section>
+
+<section class="card"><h2>4. 連抽控制</h2>
+<div id="now" class="now"><div class="muted">尚未開始</div><strong>先建立抽選佇列</strong></div>
+<div class="actions"><button class="btn primary" id="start">開始連抽</button><button class="btn danger" id="pause" disabled>暫停</button></div>
+<p class="tiny">正式版會在這裡開啟 LINE；你抽完回 Safari 後，程式會自動進下一筆。</p>
+</section>
+</div>
+
+<div class="sticky"><div class="stickyin"><button class="btn" id="skip">⏭ 跳過本筆</button><button class="btn primary" id="next">下一抽</button></div></div>
+
+<script>
+const DB = [
+{area:"台北市",store:"Funbox 南港潤泰",time:"11:00",items:["UX-01","UX-03","UX-13","UX-14","UX-16","UX-17","UX-19","CX-00","CX-01","CX-02","CX-03","CX-05","CX-08","CX-11","CX-13","CX-14","CX-15","CX-16","CX-19","BXG-01"]},
+{area:"台北市",store:"Funbox 信義A8",time:"11:00",items:["UX-01","UX-03","UX-13","UX-14","UX-16","UX-17","UX-19","CX-00","CX-01","CX-02","CX-03","CX-05","CX-08","CX-13","CX-14","CX-15","CX-16","CX-17"]},
+{area:"台北市",store:"Funbox-忠孝SOGO店",time:"11:00",items:["UX-01","UX-03","UX-13","UX-14","UX-16","UX-17","CX-00","CX-01","CX-02","CX-03","CX-05","CX-08","CX-13","CX-14","CX-15","CX-16","CX-19"]},
+{area:"台北市",store:"來玩聚-台北地下街店",time:"12:00",items:["BX-09","UX-01","UX-03","UX-13","UX-14","UX-15","UX-16","UX-17","UX-19","UX-20","CX-00","CX-01","CX-02","CX-03","CX-05","CX-08","CX-11","CX-13","CX-14","CX-15","CX-16","CX-17","CX-19"]},
+{area:"台北市",store:"Funbox-新光三越站前店",time:"11:00",items:["UX-01","UX-13","UX-16","UX-17","UX-19","CX-00","CX-01","CX-02","CX-03","CX-05","CX-08","CX-11","CX-13","CX-14","CX-15","CX-16","CX-17"]},
+{area:"桃園市",store:"Funbox 桃園新光站前店",time:"11:00",items:["BX-37","UX-14","CX-01","CX-14","CX-16","CX-17"]},
+{area:"新竹縣",store:"Funbox 竹北遠東店",time:"11:00",items:["BX-09","UX-01","UX-03","UX-13","UX-14","UX-15","UX-16","UX-17","UX-19","CX-00","CX-01","CX-02","CX-03","CX-05","CX-08","CX-11","CX-13","CX-14","CX-15","CX-16","CX-17","CX-19","BXG-01"]},
+{area:"台中市",store:"Funbox 台中港三井店",time:"11:00",items:["UX-01","UX-03","UX-13","UX-14","UX-15","UX-16","UX-17","UX-19","CX-00","CX-01","CX-02","CX-03","CX-05","CX-08","CX-11","CX-13","CX-14","CX-15","CX-16","CX-17"]},
+{area:"台中市",store:"Funbox 廣三SOGO",time:"11:00",items:["UX-01","UX-03","UX-13","UX-17","CX-00","CX-02","CX-03","CX-11","CX-13","CX-15"]},
+{area:"嘉義市",store:"Funbox 嘉義遠東",time:"11:00",items:["UX-01","UX-03","UX-13","UX-14","UX-15","UX-16","UX-17","UX-19","UX-20","CX-00","CX-01","CX-02","CX-03","CX-05","CX-08","CX-11","CX-13","CX-14","CX-15","CX-16","CX-17","CX-19"]},
+{area:"嘉義市",store:"Funbox 嘉義三越",time:"11:00",items:["BX-09","UX-01","UX-03","UX-13","UX-14","UX-15","UX-16","UX-17","UX-19","CX-00","CX-01","CX-02","CX-03","CX-05","CX-08","CX-11","CX-13","CX-14","CX-15","CX-16","CX-17"]},
+{area:"台南市",store:"來玩聚-新仁店",time:"11:00",items:["UX-01","UX-13","UX-14","UX-16","UX-17","CX-00","CX-02","CX-03","CX-05","CX-08","CX-13","CX-14","CX-15","CX-16","CX-17"]},
+{area:"高雄市",store:"來玩聚 鳳山店",time:"11:00",items:["UX-01","UX-13","UX-14","UX-16","UX-17","CX-01","CX-02","CX-03","CX-05","CX-08","CX-13","CX-14","CX-15"]},
+{area:"高雄市",store:"Funbox 高雄大立店",time:"11:00",items:["UX-01","UX-03","UX-16","UX-17","UX-19","CX-00","CX-02","CX-13","CX-16","CX-17"]},
+{area:"高雄市",store:"來玩聚-新楠店",time:"10:00",items:["BX-00","UX-16","CX-00","CX-01","CX-03","CX-14","CX-16","BXG-04"]},
+{area:"屏東縣",store:"來玩聚 新屏店",time:"11:00",items:["UX-03","UX-13","UX-14","UX-16","UX-17","UX-19","UX-20","CX-00","CX-01","CX-02","CX-03","CX-05","CX-08","CX-11","CX-13","CX-14","CX-15","CX-16","CX-17"]},
+{area:"屏東縣",store:"Funbox-屏東太平洋店",time:"11:00",items:["UX-00","UX-01","UX-03","UX-13","UX-16","UX-17","CX-01","CX-02","CX-03","CX-05","CX-14","CX-15","CX-16"]},
+{area:"澎湖縣",store:"Funbox 澎湖3號港店",time:"10:00",items:["BX-00A","BX-00B","BX-37","UX-20","UX-21","CX-00A"]}
+];
+const areaNames=[...new Set(DB.map(x=>x.area))];
+let selected=JSON.parse(localStorage.getItem("areas")||"[]");
+let queue=[],idx=0,running=false,leftPage=false,returnLock=false;
+const $=s=>document.querySelector(s);
+function save(){localStorage.setItem("areas",JSON.stringify(selected))}
+function renderAreas(){
+ const box=$("#areas"); box.innerHTML="";
+ areaNames.forEach(a=>{const b=document.createElement("button");b.type="button";b.className="chip "+(selected.includes(a)?"on":"");b.textContent=a;
+ b.addEventListener("click",()=>{selected=selected.includes(a)?selected.filter(x=>x!==a):[...selected,a];save();renderAreas();renderPriority()});box.appendChild(b)});
+ $("#areaOrder").innerHTML=selected.map((a,i)=>`<span class="tag">${i+1}. ${a}</span>`).join("");
+}
+function products(){const set=new Set();DB.filter(s=>selected.includes(s.area)).forEach(s=>s.items.forEach(i=>set.add(i)));return [...set].sort((a,b)=>a.localeCompare(b,undefined,{numeric:true}))}
+function renderPriority(){
+ const old=[...document.querySelectorAll(".ps")].map(x=>x.value),p=products(),box=$("#priorities");box.innerHTML="";
+ for(let i=0;i<5;i++){const row=document.createElement("div");row.className="priority";row.innerHTML=`<span class="num">${i+1}</span><select class="ps"><option value="">— 不設定 —</option>${p.map(x=>`<option value="${x}">${x}</option>`).join("")}</select>`;box.appendChild(row);if(old[i]&&p.includes(old[i]))row.querySelector("select").value=old[i]}
+}
+function buildQueue(){
+ const ps=[...document.querySelectorAll(".ps")].map(x=>x.value).filter(Boolean),used=new Set(),q=[];
+ ps.forEach((code,pi)=>DB.filter(s=>selected.includes(s.area)&&s.items.includes(code)).forEach(s=>{const key=s.store+"|"+code;if(!used.has(key)){q.push({...s,item:code,priority:pi+1});used.add(key)}}));
+ selected.forEach(area=>DB.filter(s=>s.area===area).forEach(s=>s.items.forEach(code=>{const key=s.store+"|"+code;if(!used.has(key)){q.push({...s,item:code,priority:0});used.add(key)}})));
+ queue=q;idx=0;renderQueue();renderNow();
+}
+function renderQueue(){
+ const pc=queue.filter(x=>x.priority).length;$("#count").textContent=queue.length;$("#pc").textContent=pc;$("#gc").textContent=queue.length-pc;
+ $("#queue").innerHTML=queue.slice(0,180).map((x,i)=>`<div class="q"><b>${i+1}</b><div><div>${x.item} · ${x.store}</div><div class="meta">${x.area} · ${x.time}</div></div><span class="badge ${x.priority?"p":""}">${x.priority?"優先"+x.priority:"一般"}</span></div>`).join("")+(queue.length>180?`<p class="tiny">另有 ${queue.length-180} 筆未顯示</p>`:"");
+}
+function renderNow(){const x=queue[idx];if(!x){$("#now").innerHTML='<div class="muted">目前狀態</div><strong>'+(queue.length?"全部完成 ✓":"尚未建立佇列")+"</strong>";return}$("#now").innerHTML=`<div class="muted">第 ${idx+1} / ${queue.length} 抽 ${x.priority?"· 優先 "+x.priority:""}</div><strong>${x.item}</strong><div>${x.area} · ${x.store}</div><div class="muted">開始時間 ${x.time}</div>`}
+function openCurrent(){if(!running||!queue[idx])return;renderNow()}
+function advance(){if(!queue.length)return;if(idx<queue.length)idx++;renderNow();if(running&&idx<queue.length)setTimeout(openCurrent,280);if(idx>=queue.length){running=false;$("#pause").disabled=true}}
+$("#build").addEventListener("click",buildQueue);
+$("#reset").addEventListener("click",()=>{selected=[];queue=[];idx=0;save();renderAreas();renderPriority();renderQueue();renderNow()});
+$("#start").addEventListener("click",()=>{if(!queue.length)buildQueue();if(!queue.length)return alert("請先選擇至少一個地區");running=true;leftPage=false;$("#pause").disabled=false;openCurrent()});
+$("#pause").addEventListener("click",()=>{running=false;$("#pause").disabled=true});
+$("#skip").addEventListener("click",advance);$("#next").addEventListener("click",advance);
+document.addEventListener("visibilitychange",()=>{if(!running)return;if(document.hidden){leftPage=true;return}if(leftPage&&!returnLock){returnLock=true;leftPage=false;setTimeout(()=>{advance();returnLock=false},350)}});
+window.addEventListener("pagehide",()=>{if(running)leftPage=true});
+renderAreas();renderPriority();renderQueue();renderNow();
+const st=document.getElementById("jsStatus");st.textContent="✓ 程式已啟動，可以點選地區與優先品項";st.classList.add("ok");
+</script></body></html>
