@@ -20,7 +20,7 @@ select{width:100%;padding:12px;border-radius:12px;border:1px solid #344a69;backg
 .warn{background:#2c2513;border-color:#685520;color:#ffe6a6}.sticky{position:fixed;bottom:0;left:0;right:0;background:#0a1322ee;backdrop-filter:blur(12px);border-top:1px solid #273a56;padding:10px 14px calc(10px + env(safe-area-inset-bottom));z-index:10}.stickyin{max-width:760px;margin:auto;display:grid;grid-template-columns:1fr 1fr;gap:9px}.tiny{font-size:11px;color:var(--muted)}.status{font-size:13px;margin-top:8px;color:#bcd2ec}
 </style></head>
 <body><div class="wrap">
-<h1>⚡ FUNBOX 抽選助手</h1><p class="lead">v0.8 · 已接入原頁目前的 LINE 抽獎連結</p>
+<h1>⚡ FUNBOX 抽選助手</h1><p class="lead">v0.9 · 已接入原頁目前的 LINE 抽獎連結</p>
 <div class="notice">✓ 已載入 28 間門市、469 個實際 LINE 抽獎連結。</div>
 <section class="card"><h2>1. 選擇地區（可多選）</h2><div class="sub">點選順序就是優先品項完成後的一般抽選地區順序。</div><div id="areas" class="chips"></div><div id="areaOrder" class="order"></div></section>
 <section class="card"><h2>2. 優先抽選 1～5</h2><div class="sub">商品依所選地區實際存在的品項產生。</div><div id="priorities"></div></section>
@@ -53,17 +53,16 @@ function renderQueue(){const pc=queue.filter(x=>x.priority).length;$("#count").t
 function renderNow(){const x=queue[idx];if(!x){$("#now").innerHTML='<div class="muted">目前狀態</div><strong>'+(queue.length?"全部完成 ✓":"尚未建立佇列")+"</strong>";return}$("#now").innerHTML=`<div class="muted">第 ${idx+1} / ${queue.length} 抽 ${x.priority?"· 優先 "+x.priority:""}</div><strong>${x.product}</strong><div>${x.area} · ${x.store}</div><div class="muted">${x.start}</div>`}
 function setStatus(t){$("#status").textContent=t}
 function arm(){pending=true;leftPage=false;lastOpenAt=Date.now();sessionStorage.setItem("fdh_pending","1");sessionStorage.setItem("fdh_lastOpenAt",String(lastOpenAt));sessionStorage.setItem("fdh_running","1");persistQueue()}
+const SHORTCUT_NAME="FUNBOX 開啟 LINE";
+function runLineShortcut(url){
+  const shortcutUrl="shortcuts://run-shortcut?name="+encodeURIComponent(SHORTCUT_NAME)+"&input=text&text="+encodeURIComponent(url);
+  window.location.href=shortcutUrl;
+}
 function openItem(userGesture=false){
   const x=queue[idx];if(!x)return;
-  running=true;$("#pause").disabled=false;arm();setStatus("正在開啟 LINE："+x.product);
-  const a=document.createElement("a");
-  a.href=x.url;
-  a.target="_self";
-  a.rel="external";
-  a.style.display="none";
-  document.body.appendChild(a);
-  a.click();
-  setTimeout(()=>a.remove(),1000);
+  running=true;$("#pause").disabled=false;arm();
+  setStatus("正在透過捷徑開啟 LINE："+x.product);
+  runLineShortcut(x.url);
 }
 function completeAndNext(){if(!running||!pending||returnHandling)return;if(Date.now()-lastOpenAt<RETURN_MIN)return;returnHandling=true;pending=false;sessionStorage.setItem("fdh_pending","0");idx++;persistQueue();renderNow();if(idx>=queue.length){running=false;sessionStorage.setItem("fdh_running","0");$("#pause").disabled=true;setStatus("全部完成");returnHandling=false;return}setStatus("已返回，準備下一抽…");setTimeout(()=>{returnHandling=false;if(running)openItem(false)},NEXT_DELAY)}
 function noteLeft(){if(running&&pending)leftPage=true}
@@ -82,4 +81,4 @@ $("#pause").onclick=()=>{running=false;pending=false;sessionStorage.setItem("fdh
 $("#skip").onclick=()=>{if(!queue.length)return;idx++;persistQueue();renderNow();setStatus("已跳過，目前第 "+(idx+1)+" 抽")};
 $("#open").onclick=()=>{if(!queue.length)buildQueue();if(queue[idx])openItem(true)};
 restoreQueue();renderAreas();renderPriority();renderQueue();renderNow();$("#pause").disabled=!running;if(running&&pending)setStatus("等待你從 LINE 回到此頁");
-</script><div style="text-align:center;color:#7890ad;font-size:12px;padding:18px 12px 28px">版本：v0.8 · 更新：2026/10/01 21:40 · 測試：返回後 1 秒自動下一抽</div></body></html>
+</script><div style="text-align:center;color:#7890ad;font-size:12px;padding:18px 12px 28px">版本：v0.9 · 更新：2026/10/01 21:40 · 測試：返回後 1 秒自動下一抽</div></body></html>
