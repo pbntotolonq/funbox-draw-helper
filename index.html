@@ -39,7 +39,7 @@ const areaNames=[...new Set(DB.map(x=>x.area))];
 let selected=JSON.parse(localStorage.getItem("fdh_areas")||"[]");
 let queue=[],idx=Number(sessionStorage.getItem("fdh_idx")||0),running=sessionStorage.getItem("fdh_running")==="1";
 let pending=sessionStorage.getItem("fdh_pending")==="1",leftPage=false,returnHandling=false,lastOpenAt=Number(sessionStorage.getItem("fdh_lastOpenAt")||0);
-const RETURN_MIN=700,NEXT_DELAY=450;
+const RETURN_MIN=700,NEXT_DELAY=1200;
 const $=s=>document.querySelector(s);
 const norm=t=>{const m=String(t||"").toUpperCase().match(/\b(BXG|BGX|BX|UX|CX)\s*-\s*(\d{2})\b/);return m?((m[1]==="BGX"?"BXG":m[1])+"-"+m[2]):String(t||"").trim()};
 function saveAreas(){localStorage.setItem("fdh_areas",JSON.stringify(selected))}
@@ -53,7 +53,7 @@ function renderQueue(){const pc=queue.filter(x=>x.priority).length;$("#count").t
 function renderNow(){const x=queue[idx];if(!x){$("#now").innerHTML='<div class="muted">目前狀態</div><strong>'+(queue.length?"全部完成 ✓":"尚未建立佇列")+"</strong>";return}$("#now").innerHTML=`<div class="muted">第 ${idx+1} / ${queue.length} 抽 ${x.priority?"· 優先 "+x.priority:""}</div><strong>${x.product}</strong><div>${x.area} · ${x.store}</div><div class="muted">${x.start}</div>`}
 function setStatus(t){$("#status").textContent=t}
 function arm(){pending=true;leftPage=false;lastOpenAt=Date.now();sessionStorage.setItem("fdh_pending","1");sessionStorage.setItem("fdh_lastOpenAt",String(lastOpenAt));sessionStorage.setItem("fdh_running","1");persistQueue()}
-function openItem(userGesture=false){const x=queue[idx];if(!x)return;running=true;$("#pause").disabled=false;arm();setStatus("正在開啟 LINE："+x.product);if(userGesture){const w=window.open(x.url,"funboxLineDraw");if(!w)window.location.href=x.url}else{const w=window.open(x.url,"funboxLineDraw");if(!w){setStatus("Safari 阻擋自動開啟，請按下方「開啟目前這抽」");}}}
+function openItem(userGesture=false){const x=queue[idx];if(!x)return;running=true;$("#pause").disabled=false;arm();setStatus("正在開啟 LINE："+x.product);window.location.href=x.url}
 function completeAndNext(){if(!running||!pending||returnHandling)return;if(Date.now()-lastOpenAt<RETURN_MIN)return;returnHandling=true;pending=false;sessionStorage.setItem("fdh_pending","0");idx++;persistQueue();renderNow();if(idx>=queue.length){running=false;sessionStorage.setItem("fdh_running","0");$("#pause").disabled=true;setStatus("全部完成");returnHandling=false;return}setStatus("已返回，準備下一抽…");setTimeout(()=>{returnHandling=false;if(running)openItem(false)},NEXT_DELAY)}
 function noteLeft(){if(running&&pending)leftPage=true}
 document.addEventListener("visibilitychange",()=>{if(document.hidden)noteLeft();else if(leftPage)setTimeout(completeAndNext,80)});
