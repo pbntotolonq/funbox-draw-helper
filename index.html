@@ -64,4 +64,4 @@ $("#pause").onclick=()=>{running=false;pending=false;sessionStorage.setItem("fdh
 $("#skip").onclick=()=>{if(!queue.length)return;idx++;persistQueue();renderNow();setStatus("已跳過，目前第 "+(idx+1)+" 抽")};
 $("#open").onclick=()=>{if(!queue.length)buildQueue();if(queue[idx])openItem(true)};
 restoreQueue();renderAreas();renderPriority();renderQueue();renderNow();$("#pause").disabled=!running;if(running&&pending)setStatus("等待你從 LINE 回到此頁");
-</script></body></html>
+</script><div style="text-align:center;color:#7890ad;font-size:12px;padding:18px 12px 28px">版本：v0.5 · 更新：2026/10/01 21:00 · 版本碼：4b57484</div></body></html>
