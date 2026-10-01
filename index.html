@@ -17,17 +17,22 @@ select{width:100%;padding:12px;border-radius:12px;border:1px solid #344a69;backg
 .stat{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px}.stat div{background:#0b1627;border-radius:12px;padding:10px;text-align:center}.stat b{display:block;font-size:20px}.stat small,.muted{color:var(--muted)}
 .queue{max-height:330px;overflow:auto;margin-top:10px}.q{display:grid;grid-template-columns:30px 1fr auto;gap:8px;align-items:center;padding:9px 2px;border-bottom:1px solid #23344e}.q .meta{font-size:12px;color:var(--muted)}.badge{font-size:11px;padding:4px 7px;border-radius:7px;background:#253a58}.badge.p{background:#624b13;color:#ffe59c}
 .now{background:#0a1828;border:1px solid #2e496c;border-radius:14px;padding:13px;margin:10px 0}.now strong{font-size:18px}.notice{padding:10px 12px;border-radius:12px;font-size:12px;line-height:1.5;background:#12351f;border:1px solid #2c7b4a;color:#caffdc}
-.warn{background:#2c2513;border-color:#685520;color:#ffe6a6}.sticky{position:fixed;bottom:0;left:0;right:0;background:#0a1322ee;backdrop-filter:blur(12px);border-top:1px solid #273a56;padding:10px 14px calc(10px + env(safe-area-inset-bottom));z-index:10}.stickyin{max-width:760px;margin:auto;display:grid;grid-template-columns:1fr 1fr;gap:9px}.tiny{font-size:11px;color:var(--muted)}.status{font-size:13px;margin-top:8px;color:#bcd2ec}
+.warn{background:#2c2513;border-color:#685520;color:#ffe6a6}.sticky{position:fixed;bottom:0;left:0;right:0;background:#0a1322ee;backdrop-filter:blur(12px);border-top:1px solid #273a56;padding:10px 14px calc(10px + env(safe-area-inset-bottom));z-index:10}.stickyin{max-width:760px;margin:auto;display:grid;grid-template-columns:1fr 1fr;gap:9px}.tiny{font-size:11px;color:var(--muted)}.status{font-size:13px;margin-top:8px;color:#bcd2ec}.banrow{display:grid;grid-template-columns:1fr auto;gap:8px;margin:8px 0}.banremove{border:0;border-radius:10px;padding:0 13px;background:#672d39;color:#fff;font-weight:800}.field{width:100%;padding:12px;border-radius:12px;border:1px solid #344a69;background:#0b1627;color:#fff;margin:6px 0}.fbresult{margin-top:10px;padding:10px;border-radius:12px;background:#0b1627;font-size:13px;white-space:pre-wrap}
 </style></head>
 <body><div class="wrap">
-<h1>⚡ FUNBOX 抽選助手</h1><p class="lead">v1.2 · 最新資料同步 · 品項優先 · 一鍵下一抽</p>
+<h1>⚡ FUNBOX 抽選助手</h1><p class="lead">v1.3 · 最新資料 · 優先抽選 · 禁止抽選 · FB額外抽選</p>
 <div class="notice" id="dataNotice">正在取得最新抽選資料…</div>
 <div style="margin-top:8px"><button class="btn" id="refreshData" type="button">↻ 重新整理最新資料</button></div>
 <section class="card"><h2>1. 選擇地區（可多選）</h2><div class="sub">點選順序就是優先品項完成後的一般抽選地區順序。</div><div id="areas" class="chips"></div><div id="areaOrder" class="order"></div></section>
 <section class="card"><h2>2. 優先抽選 1～5</h2><div class="sub">商品依所選地區實際存在的品項產生。</div><div id="priorities"></div></section>
-<section class="card"><h2>3. 建立抽選順序</h2><div class="actions"><button class="btn blue" id="build">建立 / 更新佇列</button><button class="btn" id="reset">清除設定</button></div>
+<section class="card"><h2>3. 🚫 禁止抽選</h2><div class="sub">選到的品項會從抽選佇列完全排除，可用＋增加多個。</div><div id="bans"></div><button class="btn" id="addBan" type="button">＋ 增加禁止品項</button></section>
+<section class="card"><h2>4. ➕ FB 額外抽選</h2><div class="sub">Facebook 常會限制網頁直接讀取。可先貼網址嘗試；若讀不到，把貼文文字貼到下方，程式會辨識地區／店家／品項／LINE 連結。</div>
+<input class="field" id="fbUrl" type="url" placeholder="貼上 Facebook 貼文網址">
+<textarea class="field" id="fbText" rows="6" placeholder="也可以直接貼上 FB 貼文全文（建議包含店名、地區、品項、lin.ee 抽選連結）"></textarea>
+<div class="actions"><button class="btn blue" id="parseFb" type="button">辨識 / 加入</button><button class="btn" id="clearFb" type="button">清除 FB 額外資料</button></div><div id="fbResult" class="fbresult">尚未加入 FB 額外抽選</div></section>
+<section class="card"><h2>5. 建立抽選順序</h2><div class="actions"><button class="btn blue" id="build">建立 / 更新佇列</button><button class="btn" id="reset">清除設定</button></div>
 <div class="stat"><div><b id="count">0</b><small>總抽數</small></div><div><b id="pc">0</b><small>優先抽</small></div><div><b id="gc">0</b><small>一般抽</small></div></div><div id="queue" class="queue"></div></section>
-<section class="card"><h2>4. LINE 連抽</h2>
+<section class="card"><h2>6. LINE 連抽</h2>
 <div id="now" class="now"><div class="muted">尚未開始</div><strong>先建立抽選佇列</strong></div>
 <div class="actions"><button class="btn primary" id="start">開始抽選</button><button class="btn danger" id="pause" disabled>停止</button></div>
 <div id="status" class="status">等待開始</div>
@@ -39,16 +44,39 @@ const FALLBACK_DB=[{"area":"台北市","store":"Funbox 南港潤泰","time":"11:
 let DB=FALLBACK_DB;
 let areaNames=[...new Set(DB.map(x=>x.area))];
 let selected=JSON.parse(localStorage.getItem("fdh_areas")||"[]");
+let banned=JSON.parse(localStorage.getItem("fdh_banned")||"[]");
+let EXTRA_DB=JSON.parse(localStorage.getItem("fdh_extra_db")||"[]");
+function allDB(){return DB.concat(EXTRA_DB)}
+
 let queue=[],idx=Number(sessionStorage.getItem("fdh_idx")||0),running=sessionStorage.getItem("fdh_running")==="1";
 let pending=sessionStorage.getItem("fdh_pending")==="1",leftPage=false,returnHandling=false,lastOpenAt=Number(sessionStorage.getItem("fdh_lastOpenAt")||0);
 const RETURN_MIN=700,NEXT_DELAY=1000;
 const $=s=>document.querySelector(s);
 const norm=t=>{const m=String(t||"").toUpperCase().match(/\b(BXG|BGX|BX|UX|CX)\s*-\s*(\d{2})\b/);return m?((m[1]==="BGX"?"BXG":m[1])+"-"+m[2]):String(t||"").trim()};
 function saveAreas(){localStorage.setItem("fdh_areas",JSON.stringify(selected))}
-function renderAreas(){const box=$("#areas");box.innerHTML="";areaNames.forEach(a=>{const b=document.createElement("button");b.type="button";b.className="chip "+(selected.includes(a)?"on":"");b.textContent=a;b.onclick=()=>{selected=selected.includes(a)?selected.filter(x=>x!==a):[...selected,a];saveAreas();renderAreas();renderPriority()};box.appendChild(b)});$("#areaOrder").innerHTML=selected.map((a,i)=>`<span class="tag">${i+1}. ${a}</span>`).join("")}
-function productMap(){const m=new Map();DB.filter(s=>selected.includes(s.area)).forEach(s=>s.items.forEach(i=>{const k=norm(i.product);if(!m.has(k))m.set(k,i.product)}));return [...m.entries()].sort((a,b)=>a[0].localeCompare(b[0],undefined,{numeric:true}))}
+function renderAreas(){const box=$("#areas");box.innerHTML="";areaNames.forEach(a=>{const b=document.createElement("button");b.type="button";b.className="chip "+(selected.includes(a)?"on":"");b.textContent=a;b.onclick=()=>{selected=selected.includes(a)?selected.filter(x=>x!==a):[...selected,a];saveAreas();renderAreas();renderPriority();renderBans()};box.appendChild(b)});$("#areaOrder").innerHTML=selected.map((a,i)=>`<span class="tag">${i+1}. ${a}</span>`).join("")}
+function productMap(){const m=new Map();allDB().filter(s=>selected.includes(s.area)).forEach(s=>s.items.forEach(i=>{const k=norm(i.product);if(!m.has(k))m.set(k,i.product)}));return [...m.entries()].sort((a,b)=>a[0].localeCompare(b[0],undefined,{numeric:true}))}
 function renderPriority(){const old=[...document.querySelectorAll(".ps")].map(x=>x.value),p=productMap(),box=$("#priorities");box.innerHTML="";for(let i=0;i<5;i++){const row=document.createElement("div");row.className="priority";row.innerHTML=`<span class="num">${i+1}</span><select class="ps"><option value="">— 不設定 —</option>${p.map(([k,label])=>`<option value="${k}">${label}</option>`).join("")}</select>`;box.appendChild(row);if(old[i]&&p.some(x=>x[0]===old[i]))row.querySelector("select").value=old[i]}}
-function buildQueue(){const ps=[...document.querySelectorAll(".ps")].map(x=>x.value).filter(Boolean),used=new Set(),q=[];ps.forEach((code,pi)=>selected.forEach(area=>DB.filter(s=>s.area===area).forEach(s=>s.items.filter(i=>norm(i.product)===code).forEach(i=>{const key=i.id;if(!used.has(key)){q.push({area:s.area,store:s.store,time:s.time,start:s.start,...i,priority:pi+1});used.add(key)}}))));selected.forEach(area=>DB.filter(s=>s.area===area).forEach(s=>s.items.forEach(i=>{if(!used.has(i.id)){q.push({area:s.area,store:s.store,time:s.time,start:s.start,...i,priority:0});used.add(i.id)}})));queue=q;idx=0;persistQueue();renderQueue();renderNow()}
+function renderBans(){
+ const p=productMap(),box=$("#bans");box.innerHTML="";
+ banned=banned.filter(Boolean);
+ banned.forEach((val,i)=>{
+   const row=document.createElement("div");row.className="banrow";
+   row.innerHTML=`<select class="bs"><option value="">— 選擇禁止品項 —</option>${p.map(([k,label])=>`<option value="${k}">${label}</option>`).join("")}</select><button class="banremove" type="button">×</button>`;
+   row.querySelector("select").value=p.some(x=>x[0]===val)?val:"";
+   row.querySelector("select").onchange=e=>{banned[i]=e.target.value;localStorage.setItem("fdh_banned",JSON.stringify(banned))};
+   row.querySelector("button").onclick=()=>{banned.splice(i,1);localStorage.setItem("fdh_banned",JSON.stringify(banned));renderBans()};
+   box.appendChild(row);
+ });
+}
+function addBan(){banned.push("");localStorage.setItem("fdh_banned",JSON.stringify(banned));renderBans()}
+function buildQueue(){
+ const ps=[...document.querySelectorAll(".ps")].map(x=>x.value).filter(Boolean);
+ const ban=new Set(banned.filter(Boolean)),used=new Set(),q=[];
+ ps.forEach((code,pi)=>{if(ban.has(code))return;selected.forEach(area=>allDB().filter(s=>s.area===area).forEach(s=>s.items.filter(i=>norm(i.product)===code).forEach(i=>{const key=i.id;if(!used.has(key)){q.push({area:s.area,store:s.store,time:s.time,start:s.start,...i,priority:pi+1});used.add(key)}})))});
+ selected.forEach(area=>allDB().filter(s=>s.area===area).forEach(s=>s.items.forEach(i=>{if(ban.has(norm(i.product)))return;if(!used.has(i.id)){q.push({area:s.area,store:s.store,time:s.time,start:s.start,...i,priority:0});used.add(i.id)}})));
+ queue=q;idx=0;openedIdx=-1;sessionStorage.setItem("fdh_opened_idx","-1");persistQueue();renderQueue();renderNow()
+}
 function persistQueue(){sessionStorage.setItem("fdh_queue",JSON.stringify(queue));sessionStorage.setItem("fdh_idx",String(idx))}
 function restoreQueue(){try{const q=JSON.parse(sessionStorage.getItem("fdh_queue")||"[]");if(Array.isArray(q))queue=q}catch(e){}}
 function renderQueue(){const pc=queue.filter(x=>x.priority).length;$("#count").textContent=queue.length;$("#pc").textContent=pc;$("#gc").textContent=queue.length-pc;$("#queue").innerHTML=queue.slice(0,220).map((x,i)=>`<div class="q"><b>${i+1}</b><div><div>${x.product}</div><div class="meta">${x.area} · ${x.store} · ${x.time}</div></div><span class="badge ${x.priority?"p":""}">${x.priority?"優先"+x.priority:"一般"}</span></div>`).join("")}
@@ -99,6 +127,30 @@ document.addEventListener("freeze",noteLeft);
 document.addEventListener("resume",()=>{if(running&&pending){leftPage=true;setTimeout(completeAndNext,80)}});
 let lastTick=Date.now();
 setInterval(()=>{const now=Date.now(),gap=now-lastTick;lastTick=now;if(running&&pending&&!returnHandling&&now-lastOpenAt>=RETURN_MIN&&gap>=1800){leftPage=true;setTimeout(completeAndNext,80)}},300);
+function inferArea(t){
+ const m=t.match(/(台北市|新北市|基隆市|桃園市|新竹市|新竹縣|苗栗縣|台中市|彰化縣|南投縣|雲林縣|嘉義市|嘉義縣|台南市|高雄市|屏東縣|宜蘭縣|花蓮縣|台東縣|澎湖縣|金門縣|連江縣)/);return m?m[1]:"FB額外";
+}
+function parseFbText(){
+ const text=$("#fbText").value.trim(),url=$("#fbUrl").value.trim();
+ if(!text){$("#fbResult").textContent="Facebook 網址受跨網站限制，若無法直接取得內容，請把貼文全文複製到文字框後再按辨識。";return}
+ const area=inferArea(text);
+ const lines=text.split(/\n+/).map(x=>x.trim()).filter(Boolean);
+ const productLines=lines.filter(x=>/\b(?:BXG|BGX|BX|UX|CX)\s*-?\s*\d{2}\b/i.test(x));
+ const links=[...text.matchAll(/https?:\/\/(?:lin\.ee|liff\.line\.me)\/[^\s<>"']+/gi)].map(x=>x[0].replace(/[，。；、)）]+$/,""));
+ let store=(lines.find(x=>/(FUNBOX|Funbox|玩具|店|門市|百貨|SOGO|遠百|新光)/i.test(x))||"FB 粉絲團額外抽選").slice(0,60);
+ const items=[];productLines.forEach((line,i)=>{
+   const mm=line.match(/((?:BXG|BGX|BX|UX|CX)\s*-?\s*\d{2}[^\n，,；;]*)/i);
+   if(mm){const product=mm[1].trim();const link=(line.match(/https?:\/\/(?:lin\.ee|liff\.line\.me)\/[^\s<>"']+/i)||[])[0]||links[i]||links[0]||url; if(link)items.push({url:link,id:"fb-"+Date.now()+"-"+i,product})}
+ });
+ if(!items.length){$("#fbResult").textContent="有讀到文字，但沒有同時辨識到「BX/UX/CX/BXG 品號」與可開啟的網址。請確認貼文文字有包含抽選連結。";return}
+ EXTRA_DB.push({area,store,time:"FB",start:"FB 貼文額外抽選",items});
+ localStorage.setItem("fdh_extra_db",JSON.stringify(EXTRA_DB));
+ areaNames=[...new Set(DB.concat(EXTRA_DB).map(x=>x.area))];
+ if(!selected.includes(area)){selected.push(area);saveAreas()}
+ renderAreas();renderPriority();renderBans();
+ $("#fbResult").textContent="✓ 已加入 "+area+" · "+store+"\n"+items.map(x=>"• "+x.product).join("\n");
+}
+function clearFb(){EXTRA_DB=[];localStorage.removeItem("fdh_extra_db");areaNames=[...new Set(DB.map(x=>x.area))];selected=selected.filter(a=>areaNames.includes(a));saveAreas();renderAreas();renderPriority();renderBans();$("#fbResult").textContent="已清除 FB 額外抽選";}
 const LIVE_SOURCE="https://raw.githubusercontent.com/UXUX11/funbox-line/main/index.html";
 function parseLiveDB(html){
   const doc=new DOMParser().parseFromString(html,"text/html"),out=[];
@@ -126,11 +178,11 @@ async function refreshLiveData(showStatus=true){
     if(!res.ok)throw new Error("HTTP "+res.status);
     const fresh=parseLiveDB(await res.text());
     if(!fresh.length)throw new Error("找不到抽選資料");
-    DB=fresh;areaNames=[...new Set(DB.map(x=>x.area))];
+    DB=fresh;areaNames=[...new Set(DB.concat(EXTRA_DB).map(x=>x.area))];
     selected=selected.filter(a=>areaNames.includes(a));saveAreas();
     queue=[];idx=0;openedIdx=-1;
     sessionStorage.removeItem("fdh_queue");sessionStorage.setItem("fdh_idx","0");sessionStorage.setItem("fdh_opened_idx","-1");
-    renderAreas();renderPriority();renderQueue();renderNow();
+    renderAreas();renderPriority();renderBans();renderQueue();renderNow();
     const links=DB.reduce((sum,s)=>sum+s.items.length,0);
     n.textContent="✓ 最新資料："+DB.length+" 間門市、"+links+" 個 LINE 抽獎連結";
     localStorage.setItem("fdh_last_refresh",new Date().toLocaleString("zh-TW"));
@@ -142,10 +194,10 @@ async function refreshLiveData(showStatus=true){
     return false;
   }
 }
-$("#build").onclick=buildQueue;$("#refreshData").onclick=()=>refreshLiveData(true);$("#reset").onclick=()=>{selected=[];queue=[];idx=0;running=false;sessionStorage.clear();saveAreas();renderAreas();renderPriority();renderQueue();renderNow();setStatus("已清除")};
+$("#addBan").onclick=addBan;$("#parseFb").onclick=parseFbText;$("#clearFb").onclick=clearFb;$("#build").onclick=buildQueue;$("#refreshData").onclick=()=>refreshLiveData(true);$("#reset").onclick=()=>{selected=[];queue=[];idx=0;running=false;sessionStorage.clear();saveAreas();renderAreas();renderPriority();renderQueue();renderNow();setStatus("已清除")};
 $("#start").onclick=()=>{if(!queue.length)buildQueue();if(!queue.length)return alert("請先選擇至少一個地區");if(openedIdx===idx)openedIdx=-1;openItem(true)};
 $("#pause").onclick=()=>{running=false;pending=false;sessionStorage.setItem("fdh_running","0");sessionStorage.setItem("fdh_pending","0");$("#pause").disabled=true;setStatus("已停止")};
 $("#skip").onclick=()=>{finishCurrent()};
 $("#open").onclick=nextAndOpen;
-restoreQueue();renderAreas();renderPriority();renderQueue();renderNow();$("#pause").disabled=!running;if(running&&pending)setStatus("等待你從 LINE 回到此頁");refreshLiveData(false);
-</script><div style="text-align:center;color:#7890ad;font-size:12px;padding:18px 12px 28px">版本：v1.2 · 更新：2026/10/01 23:05 · 即時資料＋一鍵下一抽</div></body></html>
+areaNames=[...new Set(DB.concat(EXTRA_DB).map(x=>x.area))];restoreQueue();renderAreas();renderPriority();renderQueue();renderNow();$("#pause").disabled=!running;if(running&&pending)setStatus("等待你從 LINE 回到此頁");refreshLiveData(false);
+</script><div style="text-align:center;color:#7890ad;font-size:12px;padding:18px 12px 28px">版本：v1.3 · 更新：2026/10/02 07:35 · 禁止抽選＋FB額外抽選</div></body></html>
