@@ -18,17 +18,20 @@ select{width:100%;padding:12px;border-radius:12px;border:1px solid #344a69;backg
 .queue{max-height:330px;overflow:auto;margin-top:10px}.q{display:grid;grid-template-columns:30px 1fr auto;gap:8px;align-items:center;padding:9px 2px;border-bottom:1px solid #23344e}.q .meta{font-size:12px;color:var(--muted)}.badge{font-size:11px;padding:4px 7px;border-radius:7px;background:#253a58}.badge.p{background:#624b13;color:#ffe59c}
 .now{background:#0a1828;border:1px solid #2e496c;border-radius:14px;padding:13px;margin:10px 0}.now strong{font-size:18px}.notice{padding:10px 12px;border-radius:12px;font-size:12px;line-height:1.5;background:#12351f;border:1px solid #2c7b4a;color:#caffdc}
 .warn{background:#2c2513;border-color:#685520;color:#ffe6a6}.sticky{position:fixed;bottom:0;left:0;right:0;background:#0a1322ee;backdrop-filter:blur(12px);border-top:1px solid #273a56;padding:10px 14px calc(10px + env(safe-area-inset-bottom));z-index:10}.stickyin{max-width:760px;margin:auto;display:grid;grid-template-columns:1fr 1fr;gap:9px}.tiny{font-size:11px;color:var(--muted)}.status{font-size:13px;margin-top:8px;color:#bcd2ec}.banrow{display:grid;grid-template-columns:1fr auto;gap:8px;margin:8px 0}.banremove{border:0;border-radius:10px;padding:0 13px;background:#672d39;color:#fff;font-weight:800}.field{width:100%;padding:12px;border-radius:12px;border:1px solid #344a69;background:#0b1627;color:#fff;margin:6px 0}.fbresult{margin-top:10px;padding:10px;border-radius:12px;background:#0b1627;font-size:13px;white-space:pre-wrap}
-</style></head>
+</style><script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script></head>
 <body><div class="wrap">
-<h1>⚡ FUNBOX 抽選助手</h1><p class="lead">v1.3.1 · 最新資料 · 優先抽選 · 禁止抽選 · FB額外抽選</p>
+<h1>⚡ FUNBOX 抽選助手</h1><p class="lead">v1.4 · 最新資料 · 優先抽選 · 禁止抽選 · FB額外抽選</p>
 <div class="notice" id="dataNotice">正在取得最新抽選資料…</div>
 <div style="margin-top:8px"><button class="btn" id="refreshData" type="button">↻ 重新整理最新資料</button></div>
 <section class="card"><h2>1. 選擇地區（可多選）</h2><div class="sub">點選順序就是優先品項完成後的一般抽選地區順序。</div><div id="areas" class="chips"></div><div id="areaOrder" class="order"></div></section>
 <section class="card"><h2>2. 優先抽選 1～5</h2><div class="sub">商品依所選地區實際存在的品項產生。</div><div id="priorities"></div></section>
 <section class="card"><h2>3. 🚫 禁止抽選</h2><div class="sub">選到的品項會從抽選佇列完全排除，可用＋增加多個。</div><div id="bans"></div><button class="btn" id="addBan" type="button">＋ 增加禁止品項</button></section>
-<section class="card"><h2>4. ➕ FB 額外抽選</h2><div class="sub">Facebook 常會限制網頁直接讀取。可先貼網址嘗試；若讀不到，把貼文文字貼到下方，程式會辨識地區／店家／品項／LINE 連結。</div>
+<section class="card"><h2>4. ➕ FB 額外抽選</h2><div class="sub">可貼 FB 網址、貼文文字，或直接選擇貼文截圖。截圖會在你的裝置上做文字辨識，再辨識地區／店家／品項；圖片看不到的隱藏 LINE 連結仍需另外提供。</div>
 <input class="field" id="fbUrl" type="url" placeholder="貼上 Facebook 貼文網址">
 <textarea class="field" id="fbText" rows="6" placeholder="也可以直接貼上 FB 貼文全文（建議包含店名、地區、品項、lin.ee 抽選連結）"></textarea>
+<input class="field" id="fbImage" type="file" accept="image/*">
+<div class="actions"><button class="btn" id="ocrFb" type="button">📷 辨識 FB 截圖</button><button class="btn" id="clearImage" type="button">清除截圖</button></div>
+<img id="fbPreview" alt="" style="display:none;width:100%;max-height:360px;object-fit:contain;border-radius:12px;margin:8px 0;background:#08111e">
 <div class="actions"><button class="btn blue" id="parseFb" type="button">辨識 / 加入</button><button class="btn" id="clearFb" type="button">清除 FB 額外資料</button></div><div id="fbResult" class="fbresult">尚未加入 FB 額外抽選</div></section>
 <section class="card"><h2>5. 建立抽選順序</h2><div class="actions"><button class="btn blue" id="build">建立 / 更新佇列</button><button class="btn" id="reset">清除設定</button></div>
 <div class="stat"><div><b id="count">0</b><small>總抽數</small></div><div><b id="pc">0</b><small>優先抽</small></div><div><b id="gc">0</b><small>一般抽</small></div></div><div id="queue" class="queue"></div></section>
@@ -132,6 +135,22 @@ document.addEventListener("freeze",noteLeft);
 document.addEventListener("resume",()=>{if(running&&pending){leftPage=true;setTimeout(completeAndNext,80)}});
 let lastTick=Date.now();
 setInterval(()=>{const now=Date.now(),gap=now-lastTick;lastTick=now;if(running&&pending&&!returnHandling&&now-lastOpenAt>=RETURN_MIN&&gap>=1800){leftPage=true;setTimeout(completeAndNext,80)}},300);
+async function ocrFbImage(){
+ const input=$("#fbImage"),file=input.files&&input.files[0],result=$("#fbResult");
+ if(!file){result.textContent="請先選擇一張 FB 貼文截圖。";return}
+ const preview=$("#fbPreview");preview.src=URL.createObjectURL(file);preview.style.display="block";
+ if(typeof Tesseract==="undefined"){result.textContent="⚠ 圖片辨識元件載入失敗，請確認網路後重新開啟頁面。";return}
+ result.textContent="📷 正在辨識截圖…第一次使用可能需要一些時間。";$("#ocrFb").disabled=true;
+ try{
+   const r=await Tesseract.recognize(file,"chi_tra+eng",{logger:m=>{if(m.status==="recognizing text")result.textContent="📷 正在辨識截圖… "+Math.round((m.progress||0)*100)+"%";}});
+   const txt=(r.data&&r.data.text||"").trim();
+   if(!txt){result.textContent="⚠ 沒有辨識到文字，請換一張較清楚、字較大的截圖。";return}
+   $("#fbText").value=txt;
+   const codes=[...txt.matchAll(/\b(?:BXG|BGX|BX|UX|CX)\s*-?\s*\d{2}\b/gi)].map(x=>x[0].toUpperCase());
+   result.textContent="✓ 截圖文字辨識完成"+(codes.length?"\n辨識到品號："+[...new Set(codes)].join("、"):"\n尚未明確辨識到 BX/UX/CX/BXG 品號")+"\n請檢查文字後，再按「辨識 / 加入」。";
+ }catch(e){result.textContent="⚠ 截圖辨識失敗，請重新選擇圖片再試。";}finally{$("#ocrFb").disabled=false}
+}
+function clearFbImage(){$("#fbImage").value="";$("#fbPreview").src="";$("#fbPreview").style.display="none";$("#fbResult").textContent="已清除截圖";}
 function inferArea(t){
  const m=t.match(/(台北市|新北市|基隆市|桃園市|新竹市|新竹縣|苗栗縣|台中市|彰化縣|南投縣|雲林縣|嘉義市|嘉義縣|台南市|高雄市|屏東縣|宜蘭縣|花蓮縣|台東縣|澎湖縣|金門縣|連江縣)/);return m?m[1]:"FB額外";
 }
@@ -213,10 +232,10 @@ async function refreshLiveData(showStatus=true){
     return false;
   }
 }
-$("#addBan").onclick=addBan;$("#parseFb").onclick=parseFbText;$("#clearFb").onclick=clearFb;$("#build").onclick=buildQueue;$("#refreshData").onclick=()=>refreshLiveData(true);$("#reset").onclick=()=>{selected=[];queue=[];idx=0;running=false;sessionStorage.clear();saveAreas();renderAreas();renderPriority();renderBans();renderQueue();renderNow();setStatus("已清除抽選佇列")};
+$("#ocrFb").onclick=ocrFbImage;$("#clearImage").onclick=clearFbImage;$("#addBan").onclick=addBan;$("#parseFb").onclick=parseFbText;$("#clearFb").onclick=clearFb;$("#build").onclick=buildQueue;$("#refreshData").onclick=()=>refreshLiveData(true);$("#reset").onclick=()=>{selected=[];queue=[];idx=0;running=false;sessionStorage.clear();saveAreas();renderAreas();renderPriority();renderBans();renderQueue();renderNow();setStatus("已清除抽選佇列")};
 $("#start").onclick=()=>{if(!queue.length)buildQueue();if(!queue.length)return alert("請先選擇至少一個地區");if(openedIdx===idx)openedIdx=-1;openItem(true)};
 $("#pause").onclick=()=>{running=false;pending=false;sessionStorage.setItem("fdh_running","0");sessionStorage.setItem("fdh_pending","0");$("#pause").disabled=true;setStatus("已停止")};
 $("#skip").onclick=()=>{finishCurrent()};
 $("#open").onclick=nextAndOpen;
 areaNames=[...new Set(DB.concat(EXTRA_DB).map(x=>x.area))];restoreQueue();renderAreas();renderPriority();renderBans();renderQueue();renderNow();$("#pause").disabled=!running;if(running&&pending)setStatus("等待你從 LINE 回到此頁");refreshLiveData(false);
-</script><div style="text-align:center;color:#7890ad;font-size:12px;padding:18px 12px 28px">版本：v1.3.1 · 更新：2026/10/02 07:45 · 修正禁止抽選與 FB 操作回饋</div></body></html>
+</script><div style="text-align:center;color:#7890ad;font-size:12px;padding:18px 12px 28px">版本：v1.4 · 更新：2026/10/02 07:55 · FB 截圖 OCR 測試版</div></body></html>
