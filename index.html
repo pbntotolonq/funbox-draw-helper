@@ -20,7 +20,7 @@ select{width:100%;padding:12px;border-radius:12px;border:1px solid #344a69;backg
 .warn{background:#2c2513;border-color:#685520;color:#ffe6a6}.sticky{position:fixed;bottom:0;left:0;right:0;background:#0a1322ee;backdrop-filter:blur(12px);border-top:1px solid #273a56;padding:10px 14px calc(10px + env(safe-area-inset-bottom));z-index:10}.stickyin{max-width:760px;margin:auto;display:grid;grid-template-columns:1fr 1fr;gap:9px}.tiny{font-size:11px;color:var(--muted)}.status{font-size:13px;margin-top:8px;color:#bcd2ec}
 </style></head>
 <body><div class="wrap">
-<h1>⚡ FUNBOX 抽選助手</h1><p class="lead">v0.4 · 已接入原頁目前的 LINE 抽獎連結</p>
+<h1>⚡ FUNBOX 抽選助手</h1><p class="lead">v0.6 · 已接入原頁目前的 LINE 抽獎連結</p>
 <div class="notice">✓ 已載入 28 間門市、469 個實際 LINE 抽獎連結。</div>
 <section class="card"><h2>1. 選擇地區（可多選）</h2><div class="sub">點選順序就是優先品項完成後的一般抽選地區順序。</div><div id="areas" class="chips"></div><div id="areaOrder" class="order"></div></section>
 <section class="card"><h2>2. 優先抽選 1～5</h2><div class="sub">商品依所選地區實際存在的品項產生。</div><div id="priorities"></div></section>
@@ -39,7 +39,7 @@ const areaNames=[...new Set(DB.map(x=>x.area))];
 let selected=JSON.parse(localStorage.getItem("fdh_areas")||"[]");
 let queue=[],idx=Number(sessionStorage.getItem("fdh_idx")||0),running=sessionStorage.getItem("fdh_running")==="1";
 let pending=sessionStorage.getItem("fdh_pending")==="1",leftPage=false,returnHandling=false,lastOpenAt=Number(sessionStorage.getItem("fdh_lastOpenAt")||0);
-const RETURN_MIN=700,NEXT_DELAY=1200;
+const RETURN_MIN=700,NEXT_DELAY=1000;
 const $=s=>document.querySelector(s);
 const norm=t=>{const m=String(t||"").toUpperCase().match(/\b(BXG|BGX|BX|UX|CX)\s*-\s*(\d{2})\b/);return m?((m[1]==="BGX"?"BXG":m[1])+"-"+m[2]):String(t||"").trim()};
 function saveAreas(){localStorage.setItem("fdh_areas",JSON.stringify(selected))}
@@ -57,11 +57,18 @@ function openItem(userGesture=false){const x=queue[idx];if(!x)return;running=tru
 function completeAndNext(){if(!running||!pending||returnHandling)return;if(Date.now()-lastOpenAt<RETURN_MIN)return;returnHandling=true;pending=false;sessionStorage.setItem("fdh_pending","0");idx++;persistQueue();renderNow();if(idx>=queue.length){running=false;sessionStorage.setItem("fdh_running","0");$("#pause").disabled=true;setStatus("全部完成");returnHandling=false;return}setStatus("已返回，準備下一抽…");setTimeout(()=>{returnHandling=false;if(running)openItem(false)},NEXT_DELAY)}
 function noteLeft(){if(running&&pending)leftPage=true}
 document.addEventListener("visibilitychange",()=>{if(document.hidden)noteLeft();else if(leftPage)setTimeout(completeAndNext,80)});
-window.addEventListener("blur",noteLeft);window.addEventListener("focus",()=>{if(leftPage)setTimeout(completeAndNext,80)});window.addEventListener("pagehide",noteLeft);window.addEventListener("pageshow",()=>{if(running&&pending&&Date.now()-lastOpenAt>RETURN_MIN){leftPage=true;setTimeout(completeAndNext,120)}});
+window.addEventListener("blur",noteLeft);
+window.addEventListener("focus",()=>{if(leftPage)setTimeout(completeAndNext,80)});
+window.addEventListener("pagehide",noteLeft);
+window.addEventListener("pageshow",()=>{if(running&&pending&&Date.now()-lastOpenAt>RETURN_MIN){leftPage=true;setTimeout(completeAndNext,120)}});
+document.addEventListener("freeze",noteLeft);
+document.addEventListener("resume",()=>{if(running&&pending){leftPage=true;setTimeout(completeAndNext,80)}});
+let lastTick=Date.now();
+setInterval(()=>{const now=Date.now(),gap=now-lastTick;lastTick=now;if(running&&pending&&!returnHandling&&now-lastOpenAt>=RETURN_MIN&&gap>=1800){leftPage=true;setTimeout(completeAndNext,80)}},300);
 $("#build").onclick=buildQueue;$("#reset").onclick=()=>{selected=[];queue=[];idx=0;running=false;sessionStorage.clear();saveAreas();renderAreas();renderPriority();renderQueue();renderNow();setStatus("已清除")};
 $("#start").onclick=()=>{if(!queue.length)buildQueue();if(!queue.length)return alert("請先選擇至少一個地區");openItem(true)};
 $("#pause").onclick=()=>{running=false;pending=false;sessionStorage.setItem("fdh_running","0");sessionStorage.setItem("fdh_pending","0");$("#pause").disabled=true;setStatus("已停止")};
 $("#skip").onclick=()=>{if(!queue.length)return;idx++;persistQueue();renderNow();setStatus("已跳過，目前第 "+(idx+1)+" 抽")};
 $("#open").onclick=()=>{if(!queue.length)buildQueue();if(queue[idx])openItem(true)};
 restoreQueue();renderAreas();renderPriority();renderQueue();renderNow();$("#pause").disabled=!running;if(running&&pending)setStatus("等待你從 LINE 回到此頁");
-</script><div style="text-align:center;color:#7890ad;font-size:12px;padding:18px 12px 28px">版本：v0.5 · 更新：2026/10/01 21:00 · 版本碼：4b57484</div></body></html>
+</script><div style="text-align:center;color:#7890ad;font-size:12px;padding:18px 12px 28px">版本：v0.6 · 更新：2026/10/01 21:40 · 測試：返回後 1 秒自動下一抽</div></body></html>
