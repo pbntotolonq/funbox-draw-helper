@@ -13,7 +13,8 @@ h2{font-size:17px;margin:0 0 12px}.sub{font-size:12px;color:var(--muted);margin:
 .order{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}.tag{background:#20324b;padding:6px 9px;border-radius:9px;font-size:12px}
 .priority{display:grid;grid-template-columns:34px 1fr;gap:8px;align-items:center;margin:8px 0}.num{width:32px;height:32px;border-radius:50%;display:grid;place-items:center;background:#253956;font-weight:800}
 select{width:100%;padding:12px;border-radius:12px;border:1px solid #344a69;background:#0b1627;color:#fff}
-.actions{display:grid;grid-template-columns:1fr 1fr;gap:9px}.btn{border:0;border-radius:13px;padding:13px;font-weight:800;background:#243750;color:white}.btn.primary{background:var(--green);color:#042514}.btn.blue{background:var(--blue)}.btn.danger{background:#672d39}.btn:disabled{opacity:.42}
+.actions{display:grid;grid-template-columns:1fr 1fr;gap:9px}.btn{border:0;border-radius:13px;padding:13px;font-weight:800;background:#243750;color:white;transition:transform .08s ease,filter .08s ease,box-shadow .08s ease}
+.btn:active,.btn.tapflash{transform:scale(.96);filter:brightness(.68);box-shadow:inset 0 0 0 3px rgba(255,255,255,.28)}.btn.primary{background:var(--green);color:#042514}.btn.blue{background:var(--blue)}.btn.danger{background:#672d39}.btn:disabled{opacity:.42}
 .stat{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px}.stat div{background:#0b1627;border-radius:12px;padding:10px;text-align:center}.stat b{display:block;font-size:20px}.stat small,.muted{color:var(--muted)}
 .queue{max-height:330px;overflow:auto;margin-top:10px}.q{display:grid;grid-template-columns:30px 1fr auto;gap:8px;align-items:center;padding:9px 2px;border-bottom:1px solid #23344e}.q .meta{font-size:12px;color:var(--muted)}.badge{font-size:11px;padding:4px 7px;border-radius:7px;background:#253a58}.badge.p{background:#624b13;color:#ffe59c}
 .now{background:#0a1828;border:1px solid #2e496c;border-radius:14px;padding:13px;margin:10px 0}.now strong{font-size:18px}.notice{padding:10px 12px;border-radius:12px;font-size:12px;line-height:1.5;background:#12351f;border:1px solid #2c7b4a;color:#caffdc}
@@ -30,7 +31,7 @@ select{width:100%;padding:12px;border-radius:12px;border:1px solid #344a69;backg
 @media(max-width:520px){.drawActions{gap:9px}.drawActions .btn{font-size:18px;min-height:62px}}
 .sticky,.stickyin{pointer-events:auto}.sticky .btn{pointer-events:auto;touch-action:manipulation;position:relative;z-index:1001}</style><script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script></head>
 <body><div class="wrap">
-<h1>⚡ FUNBOX 抽選助手</h1><p class="lead">v1.5.8 · 最新資料 · 優先抽選 · 禁止抽選 · FB額外抽選</p>
+<h1>⚡ FUNBOX 抽選助手</h1><p class="lead">v1.5.9 · 最新資料 · 優先抽選 · 禁止抽選 · FB額外抽選</p>
 <div class="notice" id="dataNotice">正在取得最新抽選資料…</div>
 <div style="margin-top:8px"><button class="btn" id="refreshData" type="button">↻ 重新整理最新資料</button></div>
 <section class="card"><h2>1. 選擇地區（可多選）</h2><div class="sub">點選順序就是優先品項完成後的一般抽選地區順序。</div><div id="areas" class="chips"></div><div id="areaOrder" class="order"></div></section>
@@ -105,6 +106,7 @@ function persistQueue(){sessionStorage.setItem("fdh_queue",JSON.stringify(queue)
 function restoreQueue(){try{const q=JSON.parse(sessionStorage.getItem("fdh_queue")||"[]");if(Array.isArray(q))queue=q}catch(e){}}
 function renderQueue(){const pc=queue.filter(x=>x.priority).length;$("#count").textContent=queue.length;$("#pc").textContent=pc;$("#gc").textContent=queue.length-pc;$("#queue").innerHTML=queue.slice(0,220).map((x,i)=>`<div class="q"><b>${i+1}</b><div><div>${x.product}</div><div class="meta">${x.area} · ${x.store} · ${x.time}</div></div><span class="badge ${x.priority?"p":""}">${x.priority?"優先"+x.priority:"一般"}</span></div>`).join("")}
 function renderNow(){const x=queue[idx];if(!x){$("#now").innerHTML='<div class="muted">目前狀態</div><strong>'+(queue.length?"全部完成 ✓":"尚未建立佇列")+"</strong>";return}const n=queue[idx+1];$("#now").innerHTML=`<div class="muted">目前第 ${idx+1} / ${queue.length} 抽 ${x.priority?"· 優先 "+x.priority:""}</div><strong>${x.product}</strong><div>${x.area} · ${x.store}</div><div class="muted">${x.start}</div>${n?`<div class="meta" style="margin-top:12px">下一筆：${n.product} · ${n.store}</div>`:""}` }
+function flashTap(el){if(!el)return;el.classList.add("tapflash");setTimeout(()=>el.classList.remove("tapflash"),220)}
 function setStatus(t){$("#status").textContent=t}
 function arm(){pending=true;leftPage=false;lastOpenAt=Date.now();sessionStorage.setItem("fdh_pending","1");sessionStorage.setItem("fdh_lastOpenAt",String(lastOpenAt));sessionStorage.setItem("fdh_running","1");persistQueue()}
 let openedIdx=Number(sessionStorage.getItem("fdh_opened_idx")||-1);
@@ -329,20 +331,18 @@ async function refreshLiveData(showStatus=true){
 }
 $("#ocrFb").onclick=ocrFbImage;$("#clearImage").onclick=clearFbImage;$("#addBan").onclick=addBan;$("#parseFb").onclick=parseFbText;$("#clearFb").onclick=clearFb;$("#build").onclick=buildQueue;$("#refreshData").onclick=()=>refreshLiveData(true);$("#reset").onclick=()=>{selected=[];queue=[];idx=0;running=false;sessionStorage.clear();saveAreas();renderAreas();renderPriority();renderBans();renderQueue();renderNow();setStatus("已清除抽選佇列")};
 function retryCurrent(){if(!queue.length)buildQueue();if(!queue.length)return alert("請先選擇至少一個地區");openItem(true)}
-$("#start").onclick=retryCurrent;$("#retrySticky").onclick=retryCurrent;$("#openCard").onclick=nextAndOpen;$("#skipCard").onclick=finishCurrent;
+$("#start").onclick=e=>{flashTap(e.currentTarget);retryCurrent()};$("#retrySticky").onclick=retryCurrent;$("#openCard").onclick=e=>{flashTap(e.currentTarget);nextAndOpen()};$("#skipCard").onclick=e=>{flashTap(e.currentTarget);finishCurrent()};
 $("#pause").onclick=()=>{running=false;pending=false;sessionStorage.setItem("fdh_running","0");sessionStorage.setItem("fdh_pending","0");$("#pause").disabled=true;setStatus("已停止")};
 $("#skip").onclick=()=>{finishCurrent()};
-$("#open").onclick=nextAndOpen;
-// iOS fixed-bar fallback: if Safari loses the synthetic click on the sticky NEXT,
-// touchend invokes the SAME nextAndOpen() used by section 6. Suppress the following click once.
-let stickyTouchHandled=false;
-$("#open").addEventListener("touchend",e=>{
- stickyTouchHandled=true;e.preventDefault();nextAndOpen();
- setTimeout(()=>{stickyTouchHandled=false},450);
-},{passive:false});
-$("#open").addEventListener("click",e=>{
- if(stickyTouchHandled){e.preventDefault();e.stopImmediatePropagation()}
-},true);
+// iOS fixed bottom bar: handle the real finger release directly.
+// Do not combine this with a click-capture suppressor; that was cancelling the NEXT action.
+$("#open").onclick=null;
+$("#open").addEventListener("touchend",e=>{e.preventDefault();e.stopPropagation();flashTap(e.currentTarget);nextAndOpen()},{passive:false});
+$("#retrySticky").onclick=null;
+$("#retrySticky").addEventListener("touchend",e=>{e.preventDefault();e.stopPropagation();flashTap(e.currentTarget);retryCurrent()},{passive:false});
+// Desktop/mouse fallback.
+$("#open").addEventListener("click",e=>{if(e.detail===0){flashTap(e.currentTarget);nextAndOpen()}});
+$("#retrySticky").addEventListener("click",e=>{if(e.detail===0){flashTap(e.currentTarget);retryCurrent()}});
 areaNames=[...new Set(DB.concat(EXTRA_DB).map(x=>x.area))];restoreQueue();renderAreas();renderPriority();renderBans();renderQueue();renderNow();$("#pause").disabled=!running;if(running&&pending)setStatus("等待你從 LINE 回到此頁");
 async function bootRefresh(){
  const n=$("#dataNotice");
@@ -350,4 +350,4 @@ async function bootRefresh(){
  await refreshLiveData(false);
 }
 if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",bootRefresh,{once:true});else setTimeout(bootRefresh,0);
-</script><div style="text-align:center;color:#7890ad;font-size:12px;padding:18px 12px 28px">版本：v1.5.8 · 2026/10/02 · 底部下一抽與選單6共用同一流程</div></body></html>
+</script><div style="text-align:center;color:#7890ad;font-size:12px;padding:18px 12px 28px">版本：v1.5.9 · 2026/10/02 · 修正底部下一抽觸控＋按壓變色</div></body></html>
