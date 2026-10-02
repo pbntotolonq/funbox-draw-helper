@@ -30,7 +30,7 @@ select{width:100%;padding:12px;border-radius:12px;border:1px solid #344a69;backg
 @media(max-width:520px){.drawActions{gap:9px}.drawActions .btn{font-size:18px;min-height:62px}}
 .sticky,.stickyin{pointer-events:auto}.sticky .btn{pointer-events:auto;touch-action:manipulation;position:relative;z-index:1001}</style><script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script></head>
 <body><div class="wrap">
-<h1>⚡ FUNBOX 抽選助手</h1><p class="lead">v1.5.3 · 最新資料 · 優先抽選 · 禁止抽選 · FB額外抽選</p>
+<h1>⚡ FUNBOX 抽選助手</h1><p class="lead">v1.5.4 · 最新資料 · 優先抽選 · 禁止抽選 · FB額外抽選</p>
 <div class="notice" id="dataNotice">正在取得最新抽選資料…</div>
 <div style="margin-top:8px"><button class="btn" id="refreshData" type="button">↻ 重新整理最新資料</button></div>
 <section class="card"><h2>1. 選擇地區（可多選）</h2><div class="sub">點選順序就是優先品項完成後的一般抽選地區順序。</div><div id="areas" class="chips"></div><div id="areaOrder" class="order"></div></section>
@@ -323,14 +323,8 @@ $("#start").onclick=retryCurrent;$("#retrySticky").onclick=retryCurrent;$("#open
 $("#pause").onclick=()=>{running=false;pending=false;sessionStorage.setItem("fdh_running","0");sessionStorage.setItem("fdh_pending","0");$("#pause").disabled=true;setStatus("已停止")};
 $("#skip").onclick=()=>{finishCurrent()};
 $("#open").onclick=nextAndOpen;
-// iOS fixed-bottom bar fallback: delegated pointer event prevents the sticky controls
-// from becoming visually tappable but losing their click handler after app switching.
-document.addEventListener("pointerup",e=>{
- const b=e.target.closest&&e.target.closest("#open,#retrySticky");
- if(!b)return;
- e.preventDefault();e.stopPropagation();
- if(b.id==="open")nextAndOpen();else retryCurrent();
-},{passive:false});
+// Bottom controls intentionally use the same single click path as section 6.
+// Do not add pointerup/touchend here: nextAndOpen must execute exactly once per tap.
 areaNames=[...new Set(DB.concat(EXTRA_DB).map(x=>x.area))];restoreQueue();renderAreas();renderPriority();renderBans();renderQueue();renderNow();$("#pause").disabled=!running;if(running&&pending)setStatus("等待你從 LINE 回到此頁");
 async function bootRefresh(){
  const n=$("#dataNotice");
@@ -338,4 +332,4 @@ async function bootRefresh(){
  await refreshLiveData(false);
 }
 if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",bootRefresh,{once:true});else setTimeout(bootRefresh,0);
-</script><div style="text-align:center;color:#7890ad;font-size:12px;padding:18px 12px 28px">版本：v1.5.3 · 2026/10/02 · 修正啟動自動更新資料</div></body></html>
+</script><div style="text-align:center;color:#7890ad;font-size:12px;padding:18px 12px 28px">版本：v1.5.4 · 2026/10/02 · 修正底部下一抽重複觸發</div></body></html>
