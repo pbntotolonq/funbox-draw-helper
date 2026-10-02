@@ -20,13 +20,13 @@ select{width:100%;padding:12px;border-radius:12px;border:1px solid #344a69;backg
 .warn{background:#2c2513;border-color:#685520;color:#ffe6a6}.sticky{position:fixed;bottom:0;left:0;right:0;background:#0a1322ee;backdrop-filter:blur(12px);border-top:1px solid #273a56;padding:10px 14px calc(10px + env(safe-area-inset-bottom));z-index:10}.stickyin{max-width:760px;margin:auto;display:grid;grid-template-columns:1fr 1fr;gap:9px}.tiny{font-size:11px;color:var(--muted)}.status{font-size:13px;margin-top:8px;color:#bcd2ec}.banrow{display:grid;grid-template-columns:1fr auto;gap:8px;margin:8px 0}.banremove{border:0;border-radius:10px;padding:0 13px;background:#672d39;color:#fff;font-weight:800}.field{width:100%;padding:12px;border-radius:12px;border:1px solid #344a69;background:#0b1627;color:#fff;margin:6px 0}.fbresult{margin-top:10px;padding:10px;border-radius:12px;background:#0b1627;font-size:13px;white-space:pre-wrap}
 </style><script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script></head>
 <body><div class="wrap">
-<h1>⚡ FUNBOX 抽選助手</h1><p class="lead">v1.4.4 · 最新資料 · 優先抽選 · 禁止抽選 · FB額外抽選</p>
+<h1>⚡ FUNBOX 抽選助手</h1><p class="lead">v1.5.0 · 最新資料 · 優先抽選 · 禁止抽選 · FB額外抽選</p>
 <div class="notice" id="dataNotice">正在取得最新抽選資料…</div>
 <div style="margin-top:8px"><button class="btn" id="refreshData" type="button">↻ 重新整理最新資料</button></div>
 <section class="card"><h2>1. 選擇地區（可多選）</h2><div class="sub">點選順序就是優先品項完成後的一般抽選地區順序。</div><div id="areas" class="chips"></div><div id="areaOrder" class="order"></div></section>
 <section class="card"><h2>2. 優先抽選 1～5</h2><div class="sub">商品依所選地區實際存在的品項產生。</div><div id="priorities"></div></section>
 <section class="card"><h2>3. 🚫 禁止抽選</h2><div class="sub">選到的品項會從抽選佇列完全排除，可用＋增加多個。</div><div id="bans"></div><button class="btn" id="addBan" type="button">＋ 增加禁止品項</button></section>
-<section class="card"><h2>4. ➕ FB 額外抽選</h2><div class="sub">可貼 FB 網址、貼文文字，或一次選擇同一家店的多張截圖。程式會依序 OCR 後合併成同一家店的資料；圖片看不到的隱藏 LINE 連結仍需另外提供。</div>
+<section class="card"><h2>4. ➕ FB 額外抽選</h2><div class="sub">可貼 FB 網址、貼文文字，或一次選擇同一家店的多張截圖。程式會用兩次 OCR 交叉比對 LINE 網址；只有完全一致的網址直接通過，不一致會標示待確認，避免錯網址進入抽選佇列。</div>
 <input class="field" id="fbUrl" type="url" placeholder="貼上 Facebook 貼文網址">
 <textarea class="field" id="fbText" rows="6" placeholder="也可以直接貼上 FB 貼文全文（建議包含店名、地區、品項、lin.ee 抽選連結）"></textarea>
 <input class="field" id="fbImage" type="file" accept="image/*" multiple>
@@ -155,19 +155,26 @@ async function ocrFbImage(){
  if(typeof Tesseract==="undefined"){result.textContent="⚠ 圖片辨識元件載入失敗，請確認網路後重新開啟頁面。";return}
  const preview=$("#fbPreview");preview.src=URL.createObjectURL(files[0]);preview.style.display="block";
  $("#ocrFb").disabled=true;
- const texts=[];let urlCount=0;
+ const texts=[],auditLines=[];let agreed=0,disagreed=0;
+ const rx=/https?:\/\/(?:lin\.ee|liff\.line\.me)\/[^\s<>"']+/gi;
  try{
    for(let i=0;i<files.length;i++){
      result.textContent="📷 第 "+(i+1)+" / "+files.length+" 張：辨識商品文字…";
      const r=await Tesseract.recognize(files[i],"chi_tra+eng",{logger:m=>{if(m.status==="recognizing text")result.textContent="📷 第 "+(i+1)+" / "+files.length+" 張：商品文字 "+Math.round((m.progress||0)*100)+"%";}});
      let t=(r.data&&r.data.text||"").trim();
-     result.textContent="🔗 第 "+(i+1)+" / "+files.length+" 張：重新辨識 LINE 網址…";
-     const urls=await urlOnlyOcr(files[i]);urlCount+=urls.length;
-     if(urls.length){
-       let n=0;
-       t=t.replace(/https?:\/\/(?:lin\.ee|liff\.line\.me)\/[^\s<>"']+/gi,()=>urls[n++]||"");
-       // If general OCR missed URLs entirely, append the URL-only pass so user can audit them.
-       if(n===0)t+="\n"+urls.join("\n");
+     const general=[...t.matchAll(rx)].map(x=>x[0].replace(/[，。；、)）]+$/,""));
+     result.textContent="🔗 第 "+(i+1)+" / "+files.length+" 張：交叉比對 LINE 網址…";
+     const second=await urlOnlyOcr(files[i]);
+     let n=0;
+     t=t.replace(rx,(raw)=>{
+       const a=raw.replace(/[，。；、)）]+$/,""),b=second[n++]||"";
+       if(b&&a===b){agreed++;return a}
+       disagreed++;
+       auditLines.push("第"+(i+1)+"張 網址"+n+" ⚠\nA："+a+"\nB："+(b||"第二次未辨識"));
+       return "⚠網址待確認 "+a;
+     });
+     if(second.length>general.length){
+       second.slice(general.length).forEach((u,k)=>{disagreed++;auditLines.push("第"+(i+1)+"張 額外網址"+(k+1)+" ⚠\nA：第一次未辨識\nB："+u);});
      }
      if(t)texts.push(t);
    }
@@ -176,8 +183,8 @@ async function ocrFbImage(){
    $("#fbText").value=txt;
    const codes=[...txt.matchAll(/\b(?:BXG|BGX|BX|UX|CX)\s*-?\s*\d{2}\b/gi)].map(x=>x[0].toUpperCase());
    const audit=$("#urlAudit");audit.style.display="block";
-   audit.textContent="🔗 網址二次辨識："+urlCount+" 條\n⚠ LINE 短網址仍可能因 I/l/1、O/0 等字元誤判。加入前請核對下方文字框中的網址。";
-   result.textContent="✓ 已完成 "+files.length+" 張雙重辨識"+(codes.length?"\n品號："+[...new Set(codes)].join("、"):"\n尚未明確辨識到品號")+"\nLINE 網址已用英文 OCR 放大後重新辨識。確認文字後再按「辨識 / 加入」。";
+   audit.textContent="🔒 網址交叉比對\n✓ 兩次完全一致："+agreed+" 條\n⚠ 不一致／漏讀："+disagreed+" 條"+(auditLines.length?"\n\n"+auditLines.join("\n\n"):"");
+   result.textContent="✓ 已完成 "+files.length+" 張辨識"+(codes.length?"\n品號："+[...new Set(codes)].join("、"):"")+"\n只有兩次 OCR 完全相同的 LINE 網址會直接通過；不一致的已標成「⚠網址待確認」。";
  }catch(e){result.textContent="⚠ 截圖辨識途中失敗，請重新選擇後再試。";}
  finally{$("#ocrFb").disabled=false}
 }
@@ -201,6 +208,10 @@ async function parseFbText(){
      }
    }catch(e){}
    $("#fbResult").textContent="⚠ Facebook 阻擋了網頁直接讀取這篇貼文。請在 Facebook 複製「貼文文字」貼到下方文字框，再按一次「辨識 / 加入」。";
+   return
+ }
+ if(text.includes("⚠網址待確認")){
+   $("#fbResult").textContent="⛔ 還有 LINE 網址兩次 OCR 結果不一致。請依原始截圖核對並修正文字框中的網址，再刪除該網址前面的「⚠網址待確認」後才能加入，避免錯網址進入抽選佇列。";
    return
  }
  const area=inferArea(text);
@@ -296,4 +307,4 @@ $("#pause").onclick=()=>{running=false;pending=false;sessionStorage.setItem("fdh
 $("#skip").onclick=()=>{finishCurrent()};
 $("#open").onclick=nextAndOpen;
 areaNames=[...new Set(DB.concat(EXTRA_DB).map(x=>x.area))];restoreQueue();renderAreas();renderPriority();renderBans();renderQueue();renderNow();$("#pause").disabled=!running;if(running&&pending)setStatus("等待你從 LINE 回到此頁");refreshLiveData(false);
-</script><div style="text-align:center;color:#7890ad;font-size:12px;padding:18px 12px 28px">版本：v1.4.4 · 更新：2026/10/02 · 修正同店重複商品與店名誤判</div></body></html>
+</script><div style="text-align:center;color:#7890ad;font-size:12px;padding:18px 12px 28px">版本：v1.5.0 · 更新：2026/10/02 · 修正同店重複商品與店名誤判</div></body></html>
