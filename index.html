@@ -20,7 +20,7 @@ select{width:100%;padding:12px;border-radius:12px;border:1px solid #344a69;backg
 .warn{background:#2c2513;border-color:#685520;color:#ffe6a6}.sticky{position:fixed;bottom:0;left:0;right:0;background:#0a1322ee;backdrop-filter:blur(12px);border-top:1px solid #273a56;padding:10px 14px calc(10px + env(safe-area-inset-bottom));z-index:10}.stickyin{max-width:760px;margin:auto;display:grid;grid-template-columns:1fr 1fr;gap:9px}.tiny{font-size:11px;color:var(--muted)}.status{font-size:13px;margin-top:8px;color:#bcd2ec}.banrow{display:grid;grid-template-columns:1fr auto;gap:8px;margin:8px 0}.banremove{border:0;border-radius:10px;padding:0 13px;background:#672d39;color:#fff;font-weight:800}.field{width:100%;padding:12px;border-radius:12px;border:1px solid #344a69;background:#0b1627;color:#fff;margin:6px 0}.fbresult{margin-top:10px;padding:10px;border-radius:12px;background:#0b1627;font-size:13px;white-space:pre-wrap}
 </style><script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script></head>
 <body><div class="wrap">
-<h1>⚡ FUNBOX 抽選助手</h1><p class="lead">v1.4.2 · 最新資料 · 優先抽選 · 禁止抽選 · FB額外抽選</p>
+<h1>⚡ FUNBOX 抽選助手</h1><p class="lead">v1.4.3 · 最新資料 · 優先抽選 · 禁止抽選 · FB額外抽選</p>
 <div class="notice" id="dataNotice">正在取得最新抽選資料…</div>
 <div style="margin-top:8px"><button class="btn" id="refreshData" type="button">↻ 重新整理最新資料</button></div>
 <section class="card"><h2>1. 選擇地區（可多選）</h2><div class="sub">點選順序就是優先品項完成後的一般抽選地區順序。</div><div id="areas" class="chips"></div><div id="areaOrder" class="order"></div></section>
@@ -32,6 +32,7 @@ select{width:100%;padding:12px;border-radius:12px;border:1px solid #344a69;backg
 <input class="field" id="fbImage" type="file" accept="image/*" multiple>
 <div class="actions"><button class="btn" id="ocrFb" type="button">📷 辨識同店多張截圖</button><button class="btn" id="clearImage" type="button">清除截圖</button></div>
 <img id="fbPreview" alt="" style="display:none;width:100%;max-height:360px;object-fit:contain;border-radius:12px;margin:8px 0;background:#08111e">
+<div id="urlAudit" class="fbresult" style="display:none"></div>
 <div class="actions"><button class="btn blue" id="parseFb" type="button">辨識 / 加入</button><button class="btn" id="clearFb" type="button">清除 FB 額外資料</button></div><div id="fbResult" class="fbresult">尚未加入 FB 額外抽選</div></section>
 <section class="card"><h2>5. 建立抽選順序</h2><div class="actions"><button class="btn blue" id="build">建立 / 更新佇列</button><button class="btn" id="reset">清除設定</button></div>
 <div class="stat"><div><b id="count">0</b><small>總抽數</small></div><div><b id="pc">0</b><small>優先抽</small></div><div><b id="gc">0</b><small>一般抽</small></div></div><div id="queue" class="queue"></div></section>
@@ -135,31 +136,52 @@ document.addEventListener("freeze",noteLeft);
 document.addEventListener("resume",()=>{if(running&&pending){leftPage=true;setTimeout(completeAndNext,80)}});
 let lastTick=Date.now();
 setInterval(()=>{const now=Date.now(),gap=now-lastTick;lastTick=now;if(running&&pending&&!returnHandling&&now-lastOpenAt>=RETURN_MIN&&gap>=1800){leftPage=true;setTimeout(completeAndNext,80)}},300);
+async function upscaleForUrlOcr(file){
+ const bmp=await createImageBitmap(file),maxW=2600,scale=Math.max(1,Math.min(2.4,maxW/bmp.width));
+ const cv=document.createElement("canvas");cv.width=Math.round(bmp.width*scale);cv.height=Math.round(bmp.height*scale);
+ const ctx=cv.getContext("2d");ctx.drawImage(bmp,0,0,cv.width,cv.height);return cv
+}
+async function urlOnlyOcr(file){
+ const img=await upscaleForUrlOcr(file);
+ const r=await Tesseract.recognize(img,"eng",{logger:()=>{}});
+ const raw=(r.data&&r.data.text||"");
+ return [...raw.matchAll(/(?:https?:\/\/)?lin\.ee\/[A-Za-z0-9]+/gi)].map(x=>{
+   let v=x[0].replace(/^https?:\/\//i,"");return "https://"+v;
+ });
+}
 async function ocrFbImage(){
  const input=$("#fbImage"),files=[...(input.files||[])],result=$("#fbResult");
  if(!files.length){result.textContent="請先選擇一張或多張「同一家店」的 FB 貼文截圖。";return}
  if(typeof Tesseract==="undefined"){result.textContent="⚠ 圖片辨識元件載入失敗，請確認網路後重新開啟頁面。";return}
  const preview=$("#fbPreview");preview.src=URL.createObjectURL(files[0]);preview.style.display="block";
  $("#ocrFb").disabled=true;
- const texts=[];
+ const texts=[];let urlCount=0;
  try{
    for(let i=0;i<files.length;i++){
-     result.textContent="📷 正在辨識第 "+(i+1)+" / "+files.length+" 張…";
-     const r=await Tesseract.recognize(files[i],"chi_tra+eng",{logger:m=>{
-       if(m.status==="recognizing text")result.textContent="📷 第 "+(i+1)+" / "+files.length+" 張："+Math.round((m.progress||0)*100)+"%";
-     }});
-     const t=(r.data&&r.data.text||"").trim();
+     result.textContent="📷 第 "+(i+1)+" / "+files.length+" 張：辨識商品文字…";
+     const r=await Tesseract.recognize(files[i],"chi_tra+eng",{logger:m=>{if(m.status==="recognizing text")result.textContent="📷 第 "+(i+1)+" / "+files.length+" 張：商品文字 "+Math.round((m.progress||0)*100)+"%";}});
+     let t=(r.data&&r.data.text||"").trim();
+     result.textContent="🔗 第 "+(i+1)+" / "+files.length+" 張：重新辨識 LINE 網址…";
+     const urls=await urlOnlyOcr(files[i]);urlCount+=urls.length;
+     if(urls.length){
+       let n=0;
+       t=t.replace(/https?:\/\/(?:lin\.ee|liff\.line\.me)\/[^\s<>"']+/gi,()=>urls[n++]||"");
+       // If general OCR missed URLs entirely, append the URL-only pass so user can audit them.
+       if(n===0)t+="\n"+urls.join("\n");
+     }
      if(t)texts.push(t);
    }
    const txt=texts.join("\n\n--- 同店下一張截圖 ---\n\n").trim();
-   if(!txt){result.textContent="⚠ 這 "+files.length+" 張圖片都沒有辨識到文字，請改用較清楚的截圖。";return}
+   if(!txt){result.textContent="⚠ 沒有辨識到文字，請改用較清楚的截圖。";return}
    $("#fbText").value=txt;
    const codes=[...txt.matchAll(/\b(?:BXG|BGX|BX|UX|CX)\s*-?\s*\d{2}\b/gi)].map(x=>x[0].toUpperCase());
-   result.textContent="✓ 已合併辨識 "+files.length+" 張同店截圖"+(codes.length?"\n辨識到品號："+[...new Set(codes)].join("、"):"\n尚未明確辨識到 BX/UX/CX/BXG 品號")+"\n請檢查合併文字，再按「辨識 / 加入」。";
- }catch(e){result.textContent="⚠ 多張截圖辨識途中失敗，請重新選擇後再試。";}
+   const audit=$("#urlAudit");audit.style.display="block";
+   audit.textContent="🔗 網址二次辨識："+urlCount+" 條\n⚠ LINE 短網址仍可能因 I/l/1、O/0 等字元誤判。加入前請核對下方文字框中的網址。";
+   result.textContent="✓ 已完成 "+files.length+" 張雙重辨識"+(codes.length?"\n品號："+[...new Set(codes)].join("、"):"\n尚未明確辨識到品號")+"\nLINE 網址已用英文 OCR 放大後重新辨識。確認文字後再按「辨識 / 加入」。";
+ }catch(e){result.textContent="⚠ 截圖辨識途中失敗，請重新選擇後再試。";}
  finally{$("#ocrFb").disabled=false}
 }
-function clearFbImage(){$("#fbImage").value="";$("#fbPreview").src="";$("#fbPreview").style.display="none";$("#fbResult").textContent="已清除截圖";}
+function clearFbImage(){$("#fbImage").value="";$("#fbPreview").src="";$("#fbPreview").style.display="none";$("#urlAudit").style.display="none";$("#urlAudit").textContent="";$("#fbResult").textContent="已清除截圖";}
 function hashText(s){let h=2166136261;for(let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619)}return (h>>>0).toString(36)}
 function inferArea(t){
  const m=t.match(/(台北市|新北市|基隆市|桃園市|新竹市|新竹縣|苗栗縣|台中市|彰化縣|南投縣|雲林縣|嘉義市|嘉義縣|台南市|高雄市|屏東縣|宜蘭縣|花蓮縣|台東縣|澎湖縣|金門縣|連江縣)/);return m?m[1]:"FB額外";
@@ -266,4 +288,4 @@ $("#pause").onclick=()=>{running=false;pending=false;sessionStorage.setItem("fdh
 $("#skip").onclick=()=>{finishCurrent()};
 $("#open").onclick=nextAndOpen;
 areaNames=[...new Set(DB.concat(EXTRA_DB).map(x=>x.area))];restoreQueue();renderAreas();renderPriority();renderBans();renderQueue();renderNow();$("#pause").disabled=!running;if(running&&pending)setStatus("等待你從 LINE 回到此頁");refreshLiveData(false);
-</script><div style="text-align:center;color:#7890ad;font-size:12px;padding:18px 12px 28px">版本：v1.4.2 · 更新：2026/10/02 · 修正 FB 商品與 LINE 連結配對</div></body></html>
+</script><div style="text-align:center;color:#7890ad;font-size:12px;padding:18px 12px 28px">版本：v1.4.3 · 更新：2026/10/02 · LINE 網址二次 OCR</div></body></html>
