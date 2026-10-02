@@ -30,7 +30,7 @@ select{width:100%;padding:12px;border-radius:12px;border:1px solid #344a69;backg
 @media(max-width:520px){.drawActions{gap:9px}.drawActions .btn{font-size:18px;min-height:62px}}
 .sticky,.stickyin{pointer-events:auto}.sticky .btn{pointer-events:auto;touch-action:manipulation;position:relative;z-index:1001}</style><script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script></head>
 <body><div class="wrap">
-<h1>⚡ FUNBOX 抽選助手</h1><p class="lead">v1.5.6 · 最新資料 · 優先抽選 · 禁止抽選 · FB額外抽選</p>
+<h1>⚡ FUNBOX 抽選助手</h1><p class="lead">v1.5.7 · 最新資料 · 優先抽選 · 禁止抽選 · FB額外抽選</p>
 <div class="notice" id="dataNotice">正在取得最新抽選資料…</div>
 <div style="margin-top:8px"><button class="btn" id="refreshData" type="button">↻ 重新整理最新資料</button></div>
 <section class="card"><h2>1. 選擇地區（可多選）</h2><div class="sub">點選順序就是優先品項完成後的一般抽選地區順序。</div><div id="areas" class="chips"></div><div id="areaOrder" class="order"></div></section>
@@ -106,9 +106,9 @@ function restoreQueue(){try{const q=JSON.parse(sessionStorage.getItem("fdh_queue
 function renderQueue(){const pc=queue.filter(x=>x.priority).length;$("#count").textContent=queue.length;$("#pc").textContent=pc;$("#gc").textContent=queue.length-pc;$("#queue").innerHTML=queue.slice(0,220).map((x,i)=>`<div class="q"><b>${i+1}</b><div><div>${x.product}</div><div class="meta">${x.area} · ${x.store} · ${x.time}</div></div><span class="badge ${x.priority?"p":""}">${x.priority?"優先"+x.priority:"一般"}</span></div>`).join("")}
 function syncStickyNext(){
  const a=$("#open");if(!a)return;
- // Bottom button is explicitly "下一抽": when a current item exists,
- // its native href must always be queue[idx + 1].
- const ni=idx+1,target=queue[ni]||null;
+ // Before the first draw, "下一抽" starts at item 1.
+ // After the current item has been opened, it advances exactly one item.
+ const ni=(openedIdx===idx)?idx+1:idx,target=queue[ni]||null;
  a.href=target?target.url:"#";
  a.dataset.targetIdx=target?String(ni):"";
  a.style.opacity=target?"1":".45";
@@ -153,9 +153,23 @@ function completeAndNext(){return;}
 function noteLeft(){return;}
 document.addEventListener("visibilitychange",()=>{if(document.hidden)noteLeft();else if(leftPage)setTimeout(completeAndNext,80)});
 window.addEventListener("blur",noteLeft);
-window.addEventListener("focus",()=>{if(leftPage)setTimeout(completeAndNext,80)});
+window.addEventListener("focus",()=>{
+ const saved=Number(sessionStorage.getItem("fdh_idx"));
+ if(Number.isFinite(saved))idx=saved;
+ openedIdx=Number(sessionStorage.getItem("fdh_opened_idx")||-1);
+ if(sessionStorage.getItem("fdh_render_on_return")==="1"){sessionStorage.removeItem("fdh_render_on_return");renderNow();renderQueue()}
+ if(leftPage)setTimeout(completeAndNext,80)
+});
 window.addEventListener("pagehide",noteLeft);
-window.addEventListener("pageshow",()=>{if(running&&pending&&Date.now()-lastOpenAt>RETURN_MIN){leftPage=true;setTimeout(completeAndNext,120)}});
+window.addEventListener("pageshow",()=>{
+ const saved=Number(sessionStorage.getItem("fdh_idx"));
+ if(Number.isFinite(saved))idx=saved;
+ openedIdx=Number(sessionStorage.getItem("fdh_opened_idx")||-1);
+ if(sessionStorage.getItem("fdh_render_on_return")==="1"){
+   sessionStorage.removeItem("fdh_render_on_return");renderNow();renderQueue();
+ }
+ if(running&&pending&&Date.now()-lastOpenAt>RETURN_MIN){leftPage=true;setTimeout(completeAndNext,120)}
+});
 document.addEventListener("freeze",noteLeft);
 document.addEventListener("resume",()=>{if(running&&pending){leftPage=true;setTimeout(completeAndNext,80)}});
 let lastTick=Date.now();
@@ -334,12 +348,12 @@ $("#skip").onclick=()=>{finishCurrent()};
 $("#open").onclick=e=>{
  const a=e.currentTarget,ti=Number(a.dataset.targetIdx),url=a.getAttribute("href");
  if(!url||url==="#"||!Number.isFinite(ti)){e.preventDefault();return}
- // Keep this exact native link untouched until Safari has started navigation.
- idx=ti;openedIdx=idx;
+ idx=ti;openedIdx=ti;
  sessionStorage.setItem("fdh_opened_idx",String(openedIdx));
  persistQueue();
  setStatus("正在開啟 LINE："+(queue[idx]?.product||""));
- // Do not call renderNow() here: it would rewrite the clicked anchor href before navigation.
+ // Do not rewrite the clicked href before iOS handles the native navigation.
+ sessionStorage.setItem("fdh_render_on_return","1");
 };
 // Bottom controls intentionally use the same single click path as section 6.
 // Do not add pointerup/touchend here: nextAndOpen must execute exactly once per tap.
@@ -350,4 +364,4 @@ async function bootRefresh(){
  await refreshLiveData(false);
 }
 if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",bootRefresh,{once:true});else setTimeout(bootRefresh,0);
-</script><div style="text-align:center;color:#7890ad;font-size:12px;padding:18px 12px 28px">版本：v1.5.6 · 2026/10/02 · 修正底部下一抽目標</div></body></html>
+</script><div style="text-align:center;color:#7890ad;font-size:12px;padding:18px 12px 28px">版本：v1.5.7 · 2026/10/02 · 修正第一抽與返回後進度</div></body></html>
