@@ -20,7 +20,7 @@ select{width:100%;padding:12px;border-radius:12px;border:1px solid #344a69;backg
 .warn{background:#2c2513;border-color:#685520;color:#ffe6a6}.sticky{position:fixed;bottom:0;left:0;right:0;background:#0a1322ee;backdrop-filter:blur(12px);border-top:1px solid #273a56;padding:10px 14px calc(10px + env(safe-area-inset-bottom));z-index:10}.stickyin{max-width:760px;margin:auto;display:grid;grid-template-columns:1fr 1fr;gap:9px}.tiny{font-size:11px;color:var(--muted)}.status{font-size:13px;margin-top:8px;color:#bcd2ec}.banrow{display:grid;grid-template-columns:1fr auto;gap:8px;margin:8px 0}.banremove{border:0;border-radius:10px;padding:0 13px;background:#672d39;color:#fff;font-weight:800}.field{width:100%;padding:12px;border-radius:12px;border:1px solid #344a69;background:#0b1627;color:#fff;margin:6px 0}.fbresult{margin-top:10px;padding:10px;border-radius:12px;background:#0b1627;font-size:13px;white-space:pre-wrap}
 </style><script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script></head>
 <body><div class="wrap">
-<h1>⚡ FUNBOX 抽選助手</h1><p class="lead">v1.4.1 · 最新資料 · 優先抽選 · 禁止抽選 · FB額外抽選</p>
+<h1>⚡ FUNBOX 抽選助手</h1><p class="lead">v1.4.2 · 最新資料 · 優先抽選 · 禁止抽選 · FB額外抽選</p>
 <div class="notice" id="dataNotice">正在取得最新抽選資料…</div>
 <div style="margin-top:8px"><button class="btn" id="refreshData" type="button">↻ 重新整理最新資料</button></div>
 <section class="card"><h2>1. 選擇地區（可多選）</h2><div class="sub">點選順序就是優先品項完成後的一般抽選地區順序。</div><div id="areas" class="chips"></div><div id="areaOrder" class="order"></div></section>
@@ -160,6 +160,7 @@ async function ocrFbImage(){
  finally{$("#ocrFb").disabled=false}
 }
 function clearFbImage(){$("#fbImage").value="";$("#fbPreview").src="";$("#fbPreview").style.display="none";$("#fbResult").textContent="已清除截圖";}
+function hashText(s){let h=2166136261;for(let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619)}return (h>>>0).toString(36)}
 function inferArea(t){
  const m=t.match(/(台北市|新北市|基隆市|桃園市|新竹市|新竹縣|苗栗縣|台中市|彰化縣|南投縣|雲林縣|嘉義市|嘉義縣|台南市|高雄市|屏東縣|宜蘭縣|花蓮縣|台東縣|澎湖縣|金門縣|連江縣)/);return m?m[1]:"FB額外";
 }
@@ -182,12 +183,30 @@ async function parseFbText(){
  }
  const area=inferArea(text);
  const lines=text.split(/\n+/).map(x=>x.trim()).filter(Boolean);
- const productLines=lines.filter(x=>/\b(?:BXG|BGX|BX|UX|CX)\s*-?\s*\d{2}\b/i.test(x));
- const links=[...text.matchAll(/https?:\/\/(?:lin\.ee|liff\.line\.me)\/[^\s<>"']+/gi)].map(x=>x[0].replace(/[，。；、)）]+$/,""));
+ const productRe=/\b(?:BXG|BGX|BX|UX|CX)\s*-?\s*\d{2}\b/i;
+ const linkRe=/https?:\/\/(?:lin\.ee|liff\.line\.me)\/[^\s<>"']+/i;
  let store=(lines.find(x=>/(FUNBOX|Funbox|玩具|店|門市|百貨|SOGO|遠百|新光)/i.test(x))||"FB 粉絲團額外抽選").slice(0,60);
- const items=[];productLines.forEach((line,i)=>{
+ const items=[];
+ lines.forEach((line,lineIndex)=>{
+   if(!productRe.test(line))return;
    const mm=line.match(/((?:BXG|BGX|BX|UX|CX)\s*-?\s*\d{2}[^\n，,；;]*)/i);
-   if(mm){const product=mm[1].trim();const link=(line.match(/https?:\/\/(?:lin\.ee|liff\.line\.me)\/[^\s<>"']+/i)||[])[0]||links[i]||links[0]||url; if(link)items.push({url:link,id:"fb-"+Date.now()+"-"+i,product})}
+   if(!mm)return;
+   const product=mm[1].trim();
+   let link=(line.match(linkRe)||[])[0]||"";
+   // FUNBOX FB 貼文通常是「商品名稱」下一行才是該商品 LINE 連結。
+   // 只向下找，遇到下一個商品就停止，避免把上一個/下一個商品的網址錯配。
+   if(!link){
+     for(let j=lineIndex+1;j<Math.min(lines.length,lineIndex+5);j++){
+       if(productRe.test(lines[j]))break;
+       const lm=lines[j].match(linkRe);
+       if(lm){link=lm[0];break}
+     }
+   }
+   if(link){
+     link=link.replace(/[，。；、)）]+$/,"");
+     const key=(area+"|"+store+"|"+product+"|"+link).toLowerCase();
+     items.push({url:link,id:"fb-"+hashText(key),product});
+   }
  });
  if(!items.length){$("#fbResult").textContent="有讀到文字，但沒有同時辨識到「BX/UX/CX/BXG 品號」與可開啟的網址。請確認貼文文字有包含抽選連結。";return}
  EXTRA_DB.push({area,store,time:"FB",start:"FB 貼文額外抽選",items});
@@ -195,7 +214,7 @@ async function parseFbText(){
  areaNames=[...new Set(DB.concat(EXTRA_DB).map(x=>x.area))];
  if(!selected.includes(area)){selected.push(area);saveAreas()}
  renderAreas();renderPriority();renderBans();
- $("#fbResult").textContent="✓ 已加入 "+area+" · "+store+"\n"+items.map(x=>"• "+x.product).join("\n");
+ $("#fbResult").textContent="✓ 已加入 "+area+" · "+store+"\n"+items.map(x=>"• "+x.product+"\n  ↳ "+x.url).join("\n");
 }
 function clearFb(){EXTRA_DB=[];localStorage.removeItem("fdh_extra_db");areaNames=[...new Set(DB.map(x=>x.area))];selected=selected.filter(a=>areaNames.includes(a));saveAreas();renderAreas();renderPriority();renderBans();$("#fbResult").textContent="已清除 FB 額外抽選";}
 const LIVE_SOURCE="https://raw.githubusercontent.com/UXUX11/funbox-line/main/index.html";
@@ -247,4 +266,4 @@ $("#pause").onclick=()=>{running=false;pending=false;sessionStorage.setItem("fdh
 $("#skip").onclick=()=>{finishCurrent()};
 $("#open").onclick=nextAndOpen;
 areaNames=[...new Set(DB.concat(EXTRA_DB).map(x=>x.area))];restoreQueue();renderAreas();renderPriority();renderBans();renderQueue();renderNow();$("#pause").disabled=!running;if(running&&pending)setStatus("等待你從 LINE 回到此頁");refreshLiveData(false);
-</script><div style="text-align:center;color:#7890ad;font-size:12px;padding:18px 12px 28px">版本：v1.4.1 · 更新：2026/10/02 · FB 同店多張截圖 OCR</div></body></html>
+</script><div style="text-align:center;color:#7890ad;font-size:12px;padding:18px 12px 28px">版本：v1.4.2 · 更新：2026/10/02 · 修正 FB 商品與 LINE 連結配對</div></body></html>
