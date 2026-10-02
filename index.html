@@ -30,7 +30,7 @@ select{width:100%;padding:12px;border-radius:12px;border:1px solid #344a69;backg
 @media(max-width:520px){.drawActions{gap:9px}.drawActions .btn{font-size:18px;min-height:62px}}
 .sticky,.stickyin{pointer-events:auto}.sticky .btn{pointer-events:auto;touch-action:manipulation;position:relative;z-index:1001}</style><script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script></head>
 <body><div class="wrap">
-<h1>⚡ FUNBOX 抽選助手</h1><p class="lead">v1.5.2 · 最新資料 · 優先抽選 · 禁止抽選 · FB額外抽選</p>
+<h1>⚡ FUNBOX 抽選助手</h1><p class="lead">v1.5.3 · 最新資料 · 優先抽選 · 禁止抽選 · FB額外抽選</p>
 <div class="notice" id="dataNotice">正在取得最新抽選資料…</div>
 <div style="margin-top:8px"><button class="btn" id="refreshData" type="button">↻ 重新整理最新資料</button></div>
 <section class="card"><h2>1. 選擇地區（可多選）</h2><div class="sub">點選順序就是優先品項完成後的一般抽選地區順序。</div><div id="areas" class="chips"></div><div id="areaOrder" class="order"></div></section>
@@ -306,7 +306,8 @@ async function refreshLiveData(showStatus=true){
     sessionStorage.removeItem("fdh_queue");sessionStorage.setItem("fdh_idx","0");sessionStorage.setItem("fdh_opened_idx","-1");
     renderAreas();renderPriority();renderBans();renderQueue();renderNow();
     const links=DB.reduce((sum,s)=>sum+s.items.length,0);
-    n.textContent="✓ 最新資料："+DB.length+" 間門市、"+links+" 個 LINE 抽獎連結";
+    const refreshedAt=new Date().toLocaleTimeString("zh-TW",{hour:"2-digit",minute:"2-digit"});
+    n.textContent="✓ 已自動更新 "+refreshedAt+"｜"+DB.length+" 間門市、"+links+" 個 LINE 抽獎連結";
     localStorage.setItem("fdh_last_refresh",new Date().toLocaleString("zh-TW"));
     return true;
   }catch(err){
@@ -330,5 +331,11 @@ document.addEventListener("pointerup",e=>{
  e.preventDefault();e.stopPropagation();
  if(b.id==="open")nextAndOpen();else retryCurrent();
 },{passive:false});
-areaNames=[...new Set(DB.concat(EXTRA_DB).map(x=>x.area))];restoreQueue();renderAreas();renderPriority();renderBans();renderQueue();renderNow();$("#pause").disabled=!running;if(running&&pending)setStatus("等待你從 LINE 回到此頁");refreshLiveData(false);
-</script><div style="text-align:center;color:#7890ad;font-size:12px;padding:18px 12px 28px">版本：v1.5.2 · 2026/10/02 · 修正 iOS 底部操作列觸控</div></body></html>
+areaNames=[...new Set(DB.concat(EXTRA_DB).map(x=>x.area))];restoreQueue();renderAreas();renderPriority();renderBans();renderQueue();renderNow();$("#pause").disabled=!running;if(running&&pending)setStatus("等待你從 LINE 回到此頁");
+async function bootRefresh(){
+ const n=$("#dataNotice");
+ if(n)n.textContent="啟動中：正在自動取得最新抽選資料…";
+ await refreshLiveData(false);
+}
+if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",bootRefresh,{once:true});else setTimeout(bootRefresh,0);
+</script><div style="text-align:center;color:#7890ad;font-size:12px;padding:18px 12px 28px">版本：v1.5.3 · 2026/10/02 · 修正啟動自動更新資料</div></body></html>
