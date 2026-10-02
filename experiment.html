@@ -20,7 +20,7 @@ select{width:100%;padding:12px;border-radius:12px;border:1px solid #344a69;backg
 .warn{background:#2c2513;border-color:#685520;color:#ffe6a6}.sticky{position:fixed;bottom:0;left:0;right:0;background:#0a1322ee;backdrop-filter:blur(12px);border-top:1px solid #273a56;padding:10px 14px calc(10px + env(safe-area-inset-bottom));z-index:10}.stickyin{max-width:760px;margin:auto;display:grid;grid-template-columns:1fr 1fr;gap:9px}.tiny{font-size:11px;color:var(--muted)}.status{font-size:13px;margin-top:8px;color:#bcd2ec}.banrow{display:grid;grid-template-columns:1fr auto;gap:8px;margin:8px 0}.banremove{border:0;border-radius:10px;padding:0 13px;background:#672d39;color:#fff;font-weight:800}.field{width:100%;padding:12px;border-radius:12px;border:1px solid #344a69;background:#0b1627;color:#fff;margin:6px 0}.fbresult{margin-top:10px;padding:10px;border-radius:12px;background:#0b1627;font-size:13px;white-space:pre-wrap}
 </style><script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script></head>
 <body><div class="wrap">
-<h1>⚡ FUNBOX 抽選助手</h1><p class="lead">v1.5.0-exp1 · 最新資料 · 優先抽選 · 禁止抽選 · FB額外抽選</p>
+<h1>⚡ FUNBOX 抽選助手</h1><p class="lead">v1.5.0-exp2 · 最新資料 · 優先抽選 · 禁止抽選 · FB額外抽選</p>
 <div class="notice" id="dataNotice">正在取得最新抽選資料…</div>
 <div style="margin-top:8px"><button class="btn" id="refreshData" type="button">↻ 重新整理最新資料</button></div>
 <section class="card"><h2>1. 選擇地區（可多選）</h2><div class="sub">點選順序就是優先品項完成後的一般抽選地區順序。</div><div id="areas" class="chips"></div><div id="areaOrder" class="order"></div></section>
@@ -37,10 +37,10 @@ select{width:100%;padding:12px;border-radius:12px;border:1px solid #344a69;backg
 <section class="card"><h2>5. 建立抽選順序</h2><div class="actions"><button class="btn blue" id="build">建立 / 更新佇列</button><button class="btn" id="reset">清除設定</button></div>
 <div class="stat"><div><b id="count">0</b><small>總抽數</small></div><div><b id="pc">0</b><small>優先抽</small></div><div><b id="gc">0</b><small>一般抽</small></div></div><div id="queue" class="queue"></div></section>
 <section class="card" style="border-color:#7b5cff"><h2>🧪 全自動實驗模式</h2>
-<div class="sub">獨立測試，不修改正式版。先用目前佇列第 1 筆測試 LINE/LIFF 能否留在網頁環境。</div>
+<div class="sub">獨立測試，不修改正式版。完成 LINE 抽獎後只要切回 FUNBOX，程式會嘗試自動前進並開啟下一筆。</div>
 <div class="actions"><button class="btn blue" id="expWeb">測試第 1 筆 Web 模式</button><button class="btn" id="expDirect">測試外部瀏覽器提示</button></div>
 <div id="expStatus" class="status">尚未測試。請先建立佇列。</div>
-<p class="tiny">這一版只確認環境，不會自動按「參加抽獎／確定」。若能留在 Safari，再做第二階段自動操作。</p></section>
+<p class="tiny">這一版不會替你按 LINE 裡的「參加抽獎／確定」；只測試回到 FUNBOX 後能否免按「下一抽」自動開下一筆。iOS 若阻擋第二次自動跳轉，頁面會停在 FUNBOX。</p></section>
 <section class="card"><h2>6. LINE 連抽</h2>
 <div id="now" class="now"><div class="muted">尚未開始</div><strong>先建立抽選佇列</strong></div>
 <div class="actions"><button class="btn primary" id="start">開始抽選</button><button class="btn danger" id="pause" disabled>停止</button></div>
@@ -307,6 +307,7 @@ async function refreshLiveData(showStatus=true){
   }
 }
 function expItem(){if(!queue.length)buildQueue();if(!queue.length){alert("請先建立抽選佇列");return null}return queue[0]}
+let expAuto=localStorage.getItem("fdh_exp_auto")==="1",expLeft=false,expReturnLock=false;
 function expOpen(mode){
  const x=expItem();if(!x)return;
  $("#expStatus").textContent="正在測試："+x.product+"\n觀察開啟後是在 Safari 還是 LINE App。";
@@ -315,10 +316,33 @@ function expOpen(mode){
  const w=window.open(u,"_blank");
  if(!w)$("#expStatus").textContent="⚠ iPhone 阻擋測試視窗，請允許彈出式視窗後重試。";
 }
-$("#expWeb").onclick=()=>expOpen("web");$("#expDirect").onclick=()=>expOpen("external");$("#ocrFb").onclick=ocrFbImage;$("#clearImage").onclick=clearFbImage;$("#addBan").onclick=addBan;$("#parseFb").onclick=parseFbText;$("#clearFb").onclick=clearFb;$("#build").onclick=buildQueue;$("#refreshData").onclick=()=>refreshLiveData(true);$("#reset").onclick=()=>{selected=[];queue=[];idx=0;running=false;sessionStorage.clear();saveAreas();renderAreas();renderPriority();renderBans();renderQueue();renderNow();setStatus("已清除抽選佇列")};
+function expAutoOpen(){
+ if(!queue.length)buildQueue();
+ if(!queue.length)return alert("請先建立抽選佇列");
+ expAuto=true;localStorage.setItem("fdh_exp_auto","1");
+ $("#expStatus").textContent="🧪 回程式自動下一抽：已啟動。\n完成 LINE 抽獎後，請切回這個 FUNBOX 頁面。";
+ openItem(true);
+}
+document.addEventListener("visibilitychange",()=>{
+ if(!expAuto)return;
+ if(document.hidden){expLeft=true;return}
+ if(!expLeft||expReturnLock)return;
+ expLeft=false;expReturnLock=true;
+ setTimeout(()=>{
+   if(openedIdx===idx){idx++;persistQueue();renderNow()}
+   if(idx>=queue.length){expAuto=false;localStorage.removeItem("fdh_exp_auto");$("#expStatus").textContent="✓ 實驗佇列全部完成";expReturnLock=false;return}
+   $("#expStatus").textContent="↩ 已回到 FUNBOX，正在嘗試自動開啟下一抽："+queue[idx].product;
+   openItem(false);
+   setTimeout(()=>{expReturnLock=false},1200);
+ },350);
+});
+$("#expWeb").textContent="啟動：回程式自動下一抽";
+$("#expDirect").textContent="停止自動下一抽";
+$("#expWeb").onclick=expAutoOpen;
+$("#expDirect").onclick=()=>{expAuto=false;expLeft=false;localStorage.removeItem("fdh_exp_auto");$("#expStatus").textContent="已停止自動下一抽。正式版流程不受影響。"};$("#ocrFb").onclick=ocrFbImage;$("#clearImage").onclick=clearFbImage;$("#addBan").onclick=addBan;$("#parseFb").onclick=parseFbText;$("#clearFb").onclick=clearFb;$("#build").onclick=buildQueue;$("#refreshData").onclick=()=>refreshLiveData(true);$("#reset").onclick=()=>{selected=[];queue=[];idx=0;running=false;sessionStorage.clear();saveAreas();renderAreas();renderPriority();renderBans();renderQueue();renderNow();setStatus("已清除抽選佇列")};
 $("#start").onclick=()=>{if(!queue.length)buildQueue();if(!queue.length)return alert("請先選擇至少一個地區");if(openedIdx===idx)openedIdx=-1;openItem(true)};
 $("#pause").onclick=()=>{running=false;pending=false;sessionStorage.setItem("fdh_running","0");sessionStorage.setItem("fdh_pending","0");$("#pause").disabled=true;setStatus("已停止")};
 $("#skip").onclick=()=>{finishCurrent()};
 $("#open").onclick=nextAndOpen;
 areaNames=[...new Set(DB.concat(EXTRA_DB).map(x=>x.area))];restoreQueue();renderAreas();renderPriority();renderBans();renderQueue();renderNow();$("#pause").disabled=!running;if(running&&pending)setStatus("等待你從 LINE 回到此頁");refreshLiveData(false);
-</script><div style="text-align:center;color:#7890ad;font-size:12px;padding:18px 12px 28px">版本：v1.5.0-exp1 · 2026/10/02 · 全自動 Web/LIFF 環境實驗</div></body></html>
+</script><div style="text-align:center;color:#7890ad;font-size:12px;padding:18px 12px 28px">版本：v1.5.0-exp2 · 2026/10/02 · 回程式自動下一抽實驗</div></body></html>
